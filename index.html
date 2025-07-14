@@ -6,12 +6,24 @@
 <title>Mamba — LLVM IR Static Analysis Framework</title>
 <style>
 :root{
-  --accent:#0071e3;
+  --accent:#0a84ff;
+  /* light mode defaults */
   --text:#1c1c1e;
   --bg-lighter:#f8f8fa;
   --bg-light:#f1f1f3;
   --bg-white:#ffffff;
   --card:#f7f7f9;
+  --shadow:rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --text:#f2f2f2;
+    --bg-lighter:#000000;
+    --bg-light:#121212;
+    --bg-white:#1c1c1e;
+    --card:#2c2c2e;
+    --shadow:rgba(0,0,0,.6);
+  }
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{
@@ -35,6 +47,7 @@ nav a:hover{color:var(--accent);}nav a:hover::after{width:100%;}
 }
 .hero h2{font-size:2.75rem;font-weight:700;letter-spacing:-.03em;max-width:700px;margin:0 auto;}
 .hero p{max-width:600px;margin:1.5rem auto;font-size:1.125rem;color:#4d4d4d;}
+@media (prefers-color-scheme: dark){.hero p{color:#b3b3b3;}}
 .btn{
   display:inline-block;text-decoration:none;padding:.9rem 1.8rem;font-weight:600;border-radius:28px;border:2px solid var(--accent);color:var(--accent);transition:all .25s;
 }
@@ -46,11 +59,14 @@ section h3{font-size:2rem;font-weight:700;margin-bottom:2rem;}
 .grid{display:grid;gap:1.8rem;grid-auto-rows:1fr;}
 #features .grid{grid-template-columns:repeat(4,1fr);} 
 @media(max-width:950px){#features .grid{grid-template-columns:repeat(auto-fit,minmax(220px,1fr));}}
-.card{background:var(--card);padding:2rem;border-radius:24px;box-shadow:0 4px 16px rgba(0,0,0,.04);display:flex;flex-direction:column;justify-content:flex-start;transition:transform .3s;}
+.card{background:var(--card);padding:2rem;border-radius:24px;box-shadow:0 4px 16px var(--shadow);display:flex;flex-direction:column;justify-content:flex-start;transition:transform .3s;}
 .card:hover{transform:translateY(-6px);} 
 .card h4{font-size:1.25rem;font-weight:600;margin-bottom:.75rem;}
-.card p{color:#4d4d4d;font-size:.95rem;margin-top:auto;}
-footer{margin-top:8rem;text-align:center;padding:3rem 1rem;background:var(--bg-white);color:#6e6e73;font-size:.875rem;border-top:1px solid #e5e5ea;}
+.card p{color:#4d4d4d;font-size:.95rem;margin-top:auto;} 
+@media(prefers-color-scheme: dark){.card p{color:#cccccc;}}
+footer{
+  margin-top:8rem;text-align:center;padding:3rem 1rem;background:var(--bg-white);color:#6e6e73;font-size:.875rem;border-top:1px solid #e5e5ea;}
+@media(prefers-color-scheme: dark){footer{color:#9e9ea0;border-top:1px solid #2c2c2e;}}
 @media(max-width:600px){.hero h2{font-size:2.2rem;}}
 </style>
 </head>
@@ -65,43 +81,40 @@ footer{margin-top:8rem;text-align:center;padding:3rem 1rem;background:var(--bg-w
   </nav>
 </header>
 <section class="hero" id="about">
-  <h2>Static analysis framework for LLVM IR programs</h2>
-  <p>Mamba detects vulnerabilities across C, C++, Rust, Solana and Objective‑C by transforming LLVM IR into fast Datalog facts evaluated with Soufflé.</p>
-  <a class="btn" href="https://github.com/20urc3/mamba">View it on GitHub</a>
+  <h2>Next-gen static analysis for LLVM IR programs</h2>
+  <p>Mamba detects vulnerabilities across C, C++, Rust, Solana and Objective-C by transforming LLVM IR into fast Datalog facts evaluated with Soufflé.</p>
+  <a class="btn" href="https://github.com/20urc3/mamba">View it on GitHub</a>
 </section>
 <section id="features">
   <h3>Core Features</h3>
   <div class="grid">
-    <div class="card"><h4>Full‑Program Graphs</h4><p>Generates call graphs, CFG and ICFG for precise whole‑program understanding.</p></div>
+    <div class="card"><h4>Full-Program Graphs</h4><p>Generates call graphs, CFG and ICFG for precise whole-program understanding.</p></div>
     <div class="card"><h4>Datalog Fact Export</h4><p>Outputs lightweight facts in SQLite ready for Soufflé rule execution.</p></div>
-    <div class="card"><h4>Custom Rules</h4><p>Write expressive Datalog rules to find memory‑safety bugs, logic flaws and more.</p></div>
+    <div class="card"><h4>Custom Rules</h4><p>Write expressive Datalog rules to find memory-safety bugs, logic flaws and more.</p></div>
     <div class="card"><h4>Rust Performance</h4><p>Built in Rust for speed, safety and easy integration in security pipelines.</p></div>
   </div>
 </section>
 <section id="analysis">
   <h3>Analysis Overview</h3>
   <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));">
-    <div class="card"><h4>DAG</h4><p>Eliminates redundant computations in a basic block by sharing common sub‑expressions and tracking data dependencies.</p></div>
-    <div class="card"><h4>Call Graph</h4><p>Models inter‑function calls with synthetic nodes for external world to understand reachable and escaping edges.</p></div>
-    <div class="card"><h4>CFG</h4><p>Captures intra‑function control flow and identifies loop back‑edges for further analyses.</p></div>
-    <div class="card"><h4>Dominator Trees</h4><p>Uses Lengauer–Tarjan to compute domination and post‑domination, enabling must‑execute reasoning.</p></div>
-    <div class="card"><h4>Data‑Flow Solver</h4><p>Iterative work‑list engine supporting liveness, reaching definitions, available expressions and more.</p></div>
-    <div class="card"><h4>Alias / Points‑to</h4><p>Inclusion‑based Andersen analysis with lazy cycle detection for scalable points‑to sets.</p></div>
+    <div class="card"><h4>DAG</h4><p>Eliminates redundant computations in a basic block by sharing common sub-expressions and tracking data dependencies.</p></div>
+    <div class="card"><h4>Call Graph</h4><p>Models inter-function calls with synthetic nodes for external world to understand reachable and escaping edges.</p></div>
+    <div class="card"><h4>CFG</h4><p>Captures intra-function control flow and identifies loop back-edges for further analyses.</p></div>
+    <div class="card"><h4>Dominator Trees</h4><p>Uses Lengauer–Tarjan to compute domination and post-domination, enabling must-execute reasoning.</p></div>
+    <div class="card"><h4>Data-Flow Solver</h4><p>Iterative work-list engine supporting liveness, reaching definitions, available expressions and more.</p></div>
+    <div class="card"><h4>Alias / Points-to</h4><p>Inclusion-based Andersen analysis with lazy cycle detection for scalable points-to sets.</p></div>
   </div>
 </section>
 <section id="technology">
   <h3>Technology</h3>
   <p style="font-size:1.1rem;max-width:800px;margin:0 auto 2.5rem;">
-    Mamba is written in <strong>Rust</strong> and hooks directly into <strong>LLVM</strong> to parse bitcode files.  It transforms low‑level IR into relational facts stored in <strong>SQLite</strong>, then leverages the <a href="https://souffle-lang.github.io/" target="_blank" rel="noopener noreferrer"><strong>Soufflé</strong></a> Datalog engine for ultra‑fast rule evaluation.  This hybrid approach couples Rust’s performance with Datalog’s declarative power, giving security researchers instant feedback on program‑wide vulnerabilities—even on million‑line codebases.
+    Mamba is written in <strong>Rust</strong> and hooks directly into <strong>LLVM</strong> to parse bitcode files.  It transforms low-level IR into relational facts stored in <strong>SQLite</strong>, then leverages the <a href="https://souffle-lang.github.io/" target="_blank" rel="noopener noreferrer"><strong>Soufflé</strong></a> Datalog engine for ultra-fast rule evaluation.  This hybrid approach couples Rust’s performance with Datalog’s declarative power, giving security researchers instant feedback on program-wide vulnerabilities—even on million-line codebases.
   </p>
   <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr));">
-    <div class="card"><h4>Rust + LLVM</h4><p>Zero‑cost abstractions and memory‑safety guarantees at the core analysis layer.</p></div>
+    <div class="card"><h4>Rust + LLVM</h4><p>Zero-cost abstractions and memory-safety guarantees at the core analysis layer.</p></div>
     <div class="card"><h4>SQLite Fact Store</h4><p>Portable, queryable database of IR facts ready for inspection or external tooling.</p></div>
-    <div class="card"><h4>Soufflé Rules</h4><p>Declarative Datalog rules run orders‑of‑magnitude faster than imperative traversals.</p></div>
+    <div class="card"><h4>Soufflé Rules</h4><p>Declarative Datalog rules run orders-of-magnitude faster than imperative traversals.</p></div>
   </div>
 </section>
 <footer>
-  © 2025 Mamba. Crafted with Rust & <a href="https://souffle-lang.github.io/" target="_blank" rel="noopener noreferrer">Soufflé</a>.
-</footer>
-</body>
-</html>
+  © 2025 Mamba. Crafted with Rust & <a href="https://souffle-lang.github.io/" target
