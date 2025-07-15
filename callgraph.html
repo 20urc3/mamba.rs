@@ -4,22 +4,24 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Mamba — Call‑Graph Construction</title>
-<link rel="stylesheet" href="style.css" />
 <style>
-/* Re‑use the same token palette for consistency */
-:root{--accent:#0a84ff;--text:#1c1c1e;--bg:#ffffff;--card:#f7f7f9}
+:root{--accent:#0a84ff;--text:#1c1c1e;--bg:#ffffff;--card:#f7f7f9;--max:820px}
 @media(prefers-color-scheme:dark){:root{--text:#e6e6e6;--bg:#2a2a2e;--card:#313135}}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;margin:0;padding:2rem}
-h1{font-size:2rem;margin-bottom:1rem}
-h2{font-size:1.5rem;margin-top:2rem;margin-bottom:.75rem}
-pre{background:var(--card);padding:1rem;border-radius:16px;overflow:auto;font-size:.9rem}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.65;display:flex;justify-content:center;padding:2rem}
+main{max-width:var(--max);width:100%}
+h1{font-size:2.2rem;margin-bottom:1.25rem;text-align:center}
+h2{font-size:1.5rem;margin-top:2.25rem;margin-bottom:.9rem;text-align:center}
+.box,pre{background:var(--card);padding:1.5rem;border-radius:20px;margin-bottom:2rem}
+pre{overflow:auto;font-size:.9rem}
 code{font-family:"SFMono-Regular",Consolas,Menlo,monospace}
-.box{background:var(--card);padding:1.5rem;border-radius:24px;margin-top:2rem}
 a{color:var(--accent);text-decoration:none}
 a:hover{text-decoration:underline}
+footer{text-align:center;font-size:.85rem;margin-top:3rem}
 </style>
 </head>
 <body>
+<main>
 <h1>Call‑Graph Construction</h1>
 <div class="box">
 <p><strong>Definition:</strong> Every variable’s points‑to set is its own explicit seed (addresses taken at that variable) plus everything that flows in along assignments, loads, stores, etc.—repeat that rule until no set grows; the final sets drive the call‑graph edges.</p>
@@ -45,28 +47,26 @@ a:hover{text-decoration:underline}
   3. Resolve each remembered indirect call
        • Look up the points‑to set of its callee operand
        • Add caller → each target edge
-       • If any edge is brand‑new, the outer loop will run again
-</code></pre>
+       • If any edge is brand‑new, the outer loop will run again</code></pre>
 <h2>Mathematical Formulation</h2>
 <p><em>Notation:</em></p>
 <ul>
 <li><strong>F</strong> – all LLVM functions</li>
 <li><strong>C</strong> – the set of every call‑site instruction</li>
-<li><code>caller(c)</code> – function that contains call‑site <em>c</em></li>
+<li><code>caller(c)</code> – function containing call‑site <em>c</em></li>
 <li><code>callee(c)</code> – direct callee when <em>c</em> is a direct call</li>
-<li><code>op(c)</code> – SSA value holding the callee operand (pointer)</li>
+<li><code>op(c)</code> – SSA value holding the callee operand</li>
 </ul>
-<p>The least fixed‑point points‑to map <code>P*: V → 𝒫(F)</code> is:</p>
+<p>The least fixed‑point points‑to map:</p>
 <pre><code>P* = lfp_P ( v ↦ Seeds(v) ∪ ⋃_{(u,v)∈E} P(u) )</code></pre>
-<p>Seeds = functions whose addresses flow into <em>v</em>; <em>E</em> = all pointer‑copy edges (load, store, φ, …).</p>
-<p>Then the complete call‑graph is:</p>
+<p>Seeds = address‑taken functions flowing into <em>v</em>; <em>E</em> = all pointer‑copy edges (load, store, φ, …).</p>
+<p>The complete call‑graph:</p>
 <pre><code>CG = { ( caller(c) , t ) | c ∈ C ,
-        t ∈    { callee(c) }           if c direct
-            ∪ P*( op(c) )              if c indirect }
-</code></pre>
-<p>Every pair (<em>caller</em>, <em>t</em>) is an edge; direct calls yield one target, indirect calls yield every function in the operand’s points‑to set.</p>
-<footer style="margin-top:3rem;text-align:center;font-size:.85rem">
+        t ∈ callee(c)              if c direct
+            ∪ P*( op(c) )          if c indirect }</code></pre>
+<footer>
   <a href="index.html">← Back to main page</a>
 </footer>
+</main>
 </body>
 </html>
