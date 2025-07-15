@@ -3,70 +3,120 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Mamba — Call‑Graph Construction</title>
+<title>Mamba — Call‑Graph Construction</title>
 <style>
-:root{--accent:#0a84ff;--text:#1c1c1e;--bg:#ffffff;--card:#f7f7f9;--max:820px}
-@media(prefers-color-scheme:dark){:root{--text:#e6e6e6;--bg:#2a2a2e;--card:#313135}}
+/*****  PALETTE  *****/
+:root{
+  --accent:#0a84ff;
+  --text:#1c1c1e;
+  --bg:#ffffff;
+  --card:#f3f4f6;
+  --code:#f5f5f7;
+  --max:820px;
+}
+@media(prefers-color-scheme:dark){
+  :root{
+    --text:#e7e7e7;
+    --bg:#26262a;
+    --card:#323236;
+    --code:#2a2a2e;
+  }
+}
+/*****  RESET & BASE  *****/
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.65;display:flex;justify-content:center;padding:2rem}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  line-height:1.7;
+  display:flex;
+  justify-content:center;
+  padding:3rem 1rem;
+}
 main{max-width:var(--max);width:100%}
-h1{font-size:2.2rem;margin-bottom:1.25rem;text-align:center}
-h2{font-size:1.5rem;margin-top:2.25rem;margin-bottom:.9rem;text-align:center}
-.box,pre{background:var(--card);padding:1.5rem;border-radius:20px;margin-bottom:2rem}
-pre{overflow:auto;font-size:.9rem}
-code{font-family:"SFMono-Regular",Consolas,Menlo,monospace}
-a{color:var(--accent);text-decoration:none}
+
+/*****  TYPOGRAPHY  *****/
+h1{font-size:2.4rem;font-weight:700;text-align:center;margin-bottom:1.5rem}
+h2{font-size:1.6rem;font-weight:600;text-align:center;margin:2.5rem 0 1.2rem}
+p,li{font-size:1rem;margin-bottom:.6rem}
+
+/*****  COMPONENTS  *****/
+.box{
+  background:var(--card);
+  padding:1.8rem;
+  border-radius:24px;
+  box-shadow:0 4px 12px rgba(0,0,0,.05);
+  margin-bottom:2rem;
+}
+pre{
+  background:var(--code);
+  padding:1.5rem;
+  border-radius:20px;
+  overflow:auto;
+  font-size:.9rem;
+  margin-bottom:2rem;
+}
+code{font-family:"SFMono-Regular",Consolas,Menlo,monospace;tab-size:2}
+ul{padding-left:1.4rem;list-style:square}
+a{color:var(--accent);text-decoration:none;font-weight:500}
 a:hover{text-decoration:underline}
-footer{text-align:center;font-size:.85rem;margin-top:3rem}
+footer{text-align:center;margin-top:3.5rem;font-size:.85rem}
 </style>
 </head>
 <body>
 <main>
-<h1>Call‑Graph Construction</h1>
-<div class="box">
-<p><strong>Definition:</strong> Every variable’s points‑to set is its own explicit seed (addresses taken at that variable) plus everything that flows in along assignments, loads, stores, etc.—repeat that rule until no set grows; the final sets drive the call‑graph edges.</p>
-</div>
-<h2>Pseudo‑code</h2>
-<pre><code>repeat until we add no new edges
+  <h1>Call‑Graph Construction</h1>
 
-  1. Walk every basic block
-       • For each instruction:
-           – if it is a direct call    → add caller → callee edge
-           – if it is an indirect call → remember the call-site + operand
-           – if it copies a pointer    → remember “source pointer can flow to destination”
-             (includes store, load, bitcast, getelementptr, phi, return, param‑passing)
+  <div class="box">
+    <p><strong>Definition.</strong> Each variable’s points‑to set starts with its own address‑taken functions and grows by absorbing everything that flows along copies (assignments, loads, stores, …); iterate until no set changes. The final points‑to map drives all call‑graph edges.</p>
+  </div>
 
-  2. Pointer‑tracking phase
-       • Seed: for every v‑table slot and every “address‑taken” function,
-         put that function into the points‑to set of the variable that holds the pointer.
-       • Work‑list flood:
-           while some variable’s points‑to set just grew
-               push all destinations it flows to (from the copy list) onto the work‑list
-               copy the new functions into their points‑to sets
+  <h2>Pseudo‑code</h2>
+  <pre><code>repeat until we add no new edges
 
-  3. Resolve each remembered indirect call
-       • Look up the points‑to set of its callee operand
-       • Add caller → each target edge
-       • If any edge is brand‑new, the outer loop will run again</code></pre>
-<h2>Mathematical Formulation</h2>
-<p><em>Notation:</em></p>
-<ul>
-<li><strong>F</strong> – all LLVM functions</li>
-<li><strong>C</strong> – the set of every call‑site instruction</li>
-<li><code>caller(c)</code> – function containing call‑site <em>c</em></li>
-<li><code>callee(c)</code> – direct callee when <em>c</em> is a direct call</li>
-<li><code>op(c)</code> – SSA value holding the callee operand</li>
-</ul>
-<p>The least fixed‑point points‑to map:</p>
-<pre><code>P* = lfp_P ( v ↦ Seeds(v) ∪ ⋃_{(u,v)∈E} P(u) )</code></pre>
-<p>Seeds = address‑taken functions flowing into <em>v</em>; <em>E</em> = all pointer‑copy edges (load, store, φ, …).</p>
-<p>The complete call‑graph:</p>
-<pre><code>CG = { ( caller(c) , t ) | c ∈ C ,
-        t ∈ callee(c)              if c direct
-            ∪ P*( op(c) )          if c indirect }</code></pre>
-<footer>
-  <a href="index.html">← Back to main page</a>
-</footer>
+  ①  walk every basic block
+       • direct call   → add caller → callee edge
+       • indirect call → remember call‑site + operand
+       • pointer copy  → remember edge  src ↦ dst
+         (store, load, bitcast, getelementptr, φ, return, param)
+
+  ②  pointer‑tracking phase
+       • seed: every v‑table slot + address‑taken function
+       • work‑list flood:
+           while some P(v) just grew
+               for (v → w) in copy‑edges  push w
+               P(w) ← P(w) ∪ (new funcs)
+
+  ③  resolve remembered indirect calls
+       • for each call‑site c
+           for t in P( op(c) )   add caller(c) → t
+           if any edge new   repeat outer loop</code></pre>
+
+  <h2>Mathematical Formulation</h2>
+  <div class="box" style="background:var(--code)">
+    <p><em>Notation.</em></p>
+    <ul>
+      <li><strong>F</strong> — set of all LLVM functions</li>
+      <li><strong>C</strong> — set of all call‑site instructions</li>
+      <li><code>caller(c)</code> — function containing call‑site <cite>c</cite></li>
+      <li><code>callee(c)</code> — direct callee when <cite>c</cite> is direct</li>
+      <li><code>op(c)</code>    — SSA value holding the callee pointer</li>
+    </ul>
+
+<pre><code>P*  =  lfp_P ( v ↦ Seeds(v) ∪ ⋃_{(u,v)∈E} P(u) )
+</code></pre>
+    <p style="margin-top:-.6rem">where <em>E</em> is the set of pointer‑copy edges.</p>
+
+<pre><code>CG = { ( caller(c) , t ) │ c∈C ,
+        t ∈  { callee(c) }          if c direct
+            ∪ P*( op(c) )           if c indirect }
+</code></pre>
+    <p style="margin-top:-.6rem">Each pair (<code>caller</code>, <code>t</code>) forms a call‑graph edge.</p>
+  </div>
+
+  <footer>
+    <a href="index.html">← Back to main page</a>
+  </footer>
 </main>
 </body>
 </html>
