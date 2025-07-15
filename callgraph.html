@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mamba — Call‑Graph Construction</title>
+<link rel="stylesheet" href="style.css" />
+<style>
+/* Re‑use the same token palette for consistency */
+:root{--accent:#0a84ff;--text:#1c1c1e;--bg:#ffffff;--card:#f7f7f9}
+@media(prefers-color-scheme:dark){:root{--text:#e6e6e6;--bg:#2a2a2e;--card:#313135}}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;margin:0;padding:2rem}
+h1{font-size:2rem;margin-bottom:1rem}
+h2{font-size:1.5rem;margin-top:2rem;margin-bottom:.75rem}
+pre{background:var(--card);padding:1rem;border-radius:16px;overflow:auto;font-size:.9rem}
+code{font-family:"SFMono-Regular",Consolas,Menlo,monospace}
+.box{background:var(--card);padding:1.5rem;border-radius:24px;margin-top:2rem}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+</style>
+</head>
+<body>
+<h1>Call‑Graph Construction</h1>
+<div class="box">
+<p><strong>Definition:</strong> Every variable’s points‑to set is its own explicit seed (addresses taken at that variable) plus everything that flows in along assignments, loads, stores, etc.—repeat that rule until no set grows; the final sets drive the call‑graph edges.</p>
+</div>
+<h2>Pseudo‑code</h2>
+<pre><code>repeat until we add no new edges
+
+  1. Walk every basic block
+       • For each instruction:
+           – if it is a direct call    → add caller → callee edge
+           – if it is an indirect call → remember the call-site + operand
+           – if it copies a pointer    → remember “source pointer can flow to destination”
+             (includes store, load, bitcast, getelementptr, phi, return, param‑passing)
+
+  2. Pointer‑tracking phase
+       • Seed: for every v‑table slot and every “address‑taken” function,
+         put that function into the points‑to set of the variable that holds the pointer.
+       • Work‑list flood:
+           while some variable’s points‑to set just grew
+               push all destinations it flows to (from the copy list) onto the work‑list
+               copy the new functions into their points‑to sets
+
+  3. Resolve each remembered indirect call
+       • Look up the points‑to set of its callee operand
+       • Add caller → each target edge
+       • If any edge is brand‑new, the outer loop will run again
+</code></pre>
+<h2>Mathematical Formulation</h2>
+<p><em>Notation:</em></p>
+<ul>
+<li><strong>F</strong> – all LLVM functions</li>
+<li><strong>C</strong> – the set of every call‑site instruction</li>
+<li><code>caller(c)</code> – function that contains call‑site <em>c</em></li>
+<li><code>callee(c)</code> – direct callee when <em>c</em> is a direct call</li>
+<li><code>op(c)</code> – SSA value holding the callee operand (pointer)</li>
+</ul>
+<p>The least fixed‑point points‑to map <code>P*: V → 𝒫(F)</code> is:</p>
+<pre><code>P* = lfp_P ( v ↦ Seeds(v) ∪ ⋃_{(u,v)∈E} P(u) )</code></pre>
+<p>Seeds = functions whose addresses flow into <em>v</em>; <em>E</em> = all pointer‑copy edges (load, store, φ, …).</p>
+<p>Then the complete call‑graph is:</p>
+<pre><code>CG = { ( caller(c) , t ) | c ∈ C ,
+        t ∈    { callee(c) }           if c direct
+            ∪ P*( op(c) )              if c indirect }
+</code></pre>
+<p>Every pair (<em>caller</em>, <em>t</em>) is an edge; direct calls yield one target, indirect calls yield every function in the operand’s points‑to set.</p>
+<footer style="margin-top:3rem;text-align:center;font-size:.85rem">
+  <a href="index.html">← Back to main page</a>
+</footer>
+</body>
+</html>
