@@ -67,27 +67,34 @@ footer{text-align:center;margin-top:3.5rem;font-size:.85rem}
 <main>
   <h1>Call‑Graph Construction</h1>
 
+  <h2>Problem definition</h2>
   <div class="box">
-    <p><strong>Definition.</strong> Each variable’s points‑to set starts with its own address‑taken functions and grows by absorbing everything that flows along copies (assignments, loads, stores, …); iterate until no set changes. The final points‑to map drives all call‑graph edges.</p>
+    <p>A call graph is an artifact produced by program analysis tools to record the relationships between a function and the functions it calls. Building a callgraph,  like many static analysis, is known to be an undecidable problem, meaning there is no perfect solution to build a perfect static callgraph. It relies on tricks and techniques to approximate the best callgraph possible.</p> 
+    <p>Numerous techniques exist to improve callgraph generation at compile time, such as Reach Analysis, Class Hierarchy Analysis, Rapid type Analysis, etc. Most of these techniques are useful in an Object Oriented program paradigm, since this tool focuses more on Rust the solution differs a bit. (Maybe in the future supports for OOP languages will be added)</p>
+  </div>
+  
+  <h2>Plain text algorithm</h2>
+  <div class="box">
+    <p>Each variable’s points‑to set starts with its own address‑taken functions and grows by absorbing everything that flows along copies (assignments, loads, stores, …); iterate until no set changes. The final points‑to map drives all call‑graph edges.</p>
   </div>
 
   <h2>Pseudo‑code</h2>
   <pre><code>repeat until we add no new edges
 
-  ①  walk every basic block
+  1. walk every basic block
        • direct call   → add caller → callee edge
        • indirect call → remember call‑site + operand
        • pointer copy  → remember edge  src ↦ dst
          (store, load, bitcast, getelementptr, φ, return, param)
 
-  ②  pointer‑tracking phase
+  2. pointer‑tracking phase
        • seed: every v‑table slot + address‑taken function
        • work‑list flood:
            while some P(v) just grew
                for (v → w) in copy‑edges  push w
                P(w) ← P(w) ∪ (new funcs)
 
-  ③  resolve remembered indirect calls
+  3. resolve remembered indirect calls
        • for each call‑site c
            for t in P( op(c) )   add caller(c) → t
            if any edge new   repeat outer loop</code></pre>
