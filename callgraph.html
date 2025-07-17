@@ -90,10 +90,32 @@ footer{text-align:center;margin-top:3.5rem;font-size:.85rem}
   
   <h2>Plain text algorithm</h2>
   <div class="box">
-    <p>1. We start by giving each variable its own list of functions it might call.</p>
-    <p>2. Then, every time one variable’s value is copied into another (by assignment, load, store, φ-node, etc.), we copy all the functions from the first variable’s list into the second variable’s list.</p>
-    <p>3. We keep repeating step 2 until no variable’s list gains any new functions.</p>
-    <p>4. Finally, we build our graph. For each indirect call in the code, we look at the variable used for that call, check its final list of functions, and draw an edge from the caller to each function in that list.</p>
+    <p>We repeat the following steps until we add no new edges:</p>
+    <ol>
+      <li>
+        <strong>Walk every basic block:</strong>
+        <ul>
+          <li>When we see a direct call, we add an edge from the caller function to the callee function.</li>
+          <li>When we see an indirect call through a variable, we remember that call site and which variable holds the function pointer.</li>
+          <li>When we see any instruction that moves or copies a pointer—like <code>store</code>, <code>load</code>, <code>bitcast</code>, <code>getelementptr</code>, φ-nodes, <code>return</code>, or parameter passing—we record that the source pointer can flow to the destination pointer.</li>
+        </ul>
+      </li>
+      <li>
+        <strong>Pointer-tracking phase:</strong>
+        <ul>
+          <li><strong>Seed:</strong> Give each pointer variable a starting list of functions from every v-table slot and every function whose address was taken.</li>
+          <li><strong>Flood:</strong> As long as any variable’s list grows, copy its new functions into every variable it can flow to.</li>
+        </ul>
+      </li>
+      <li>
+        <strong>Resolve remembered indirect calls:</strong>
+        <ul>
+          <li>For each indirect call site, look up the final list of functions for its pointer variable.</li>
+          <li>Build our graph by adding an edge from the caller to each function in that list.</li>
+          <li>If we added any new edges, go back to step 1 and repeat.</li>
+        </ul>
+      </li>
+    </ol>
   </div>
 
   <h2>Pseudo‑code</h2>
