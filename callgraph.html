@@ -69,22 +69,22 @@ footer{text-align:center;margin-top:3.5rem;font-size:.85rem}
 
   <h2>Problem definition</h2>
   <div class="box">
-    <p>A call graph is an artifact produced by program analysis tools to record the relationships between a function and the functions it calls. Building a callgraph,  like many static analysis, is known to be an undecidable problem, meaning there is no perfect solution to build a perfect static callgraph. It relies on tricks and techniques to approximate the best callgraph possible.</p> 
-    Numerous techniques exist to improve callgraph generation at compile time, such as Reach Analysis, Class Hierarchy Analysis, Rapid type Analysis, etc. Most of these techniques are useful in an Object Oriented program paradigm, since this tool focuses more on Rust the solution differs a bit. (Maybe in the future supports for OOP languages will be added)<br>
-    Call-graph analysis on Rust’s LLVM IR is easier because:<br>
-    - Generics are monomorphised → almost every call is a direct call @func_name, not a virtual or template dispatch.<br>
+    <p>A call graph is an artifact produced by program analysis tools to record the <b>relationships between a function and the functions it calls</b>. Building a callgraph,  like many static analysis, is known to be an <b>undecidable</b> problem, meaning there is no perfect solution to build a perfect static callgraph. It relies on tricks and techniques to approximate the best callgraph possible. 
+    <br>Numerous techniques exist to improve callgraph generation at compile time, such as <b>Reach Analysis</b>b>, <b>Class Hierarchy Analysis</b>, <b>Rapid type Analysis</b>, etc. <br>Most of these techniques are useful in an Object Oriented program paradigm, since this tool focuses more on Rust the solution differs a bit. (Maybe in the future supports for OOP languages will be added)<br>
+    <br>Call-graph analysis on Rust’s LLVM IR is easier because:<br>
+    - Generics are monomorphised → almost every call is a direct <code>call @func_name</code>, not a virtual or template dispatch.<br>
     - No class inheritance tree → you don’t need CHA or RTA; there’s no subtype hierarchy to walk.<br>
     - Only two kinds of indirect calls:<br>
-        - Trait objects (dyn Trait) lowered to v-tables you can parse<br>
-        - Function pointers tracked by simple points-to or metadata<br>
-    Monomorphization is the process where the compiler takes a generic function or type (one written to work over any type T) and, at compile time, generates a separate, concrete version for each actual type it’s used with.<br>
-    We solve both in our fixed-point loop by:<br>
+        - <b>Trait objects (dyn Trait)</b> lowered to <b>v-tables</b> we can parse<br>
+        - <b>Function pointers</b> tracked by simple points-to or metadata<br>
+    <br><b>Monomorphization</b> is the process where the compiler takes a generic function or type (one written to work over any type T) and, at compile time, generates a separate, concrete version for each actual type it’s used with.<br>
+    <br>We solve both in our fixed-point loop by:<br>
     - Seeding the points-to sets with<br>
-        - Every function pointer stored in a @vtable.* global (trait-object slots).<br>
+        - Every function pointer stored in a <code>@vtable.* global</code> (trait-object slots).<br>
         - Every function whose address is “taken” and stored in some variable (raw function pointers).<br>
     - Propagating those seeds along all pointer‐flow edges (loads, stores, bitcasts, φ-nodes, GEPs).<br>
-    - Resolving each indirect call %p(...) by looking up the final points-to set pts[%p] and adding an edge to every function in it.<br>
-    Because monomorphized generic calls show up as call @foo_u32 or call @foo_String (i.e. direct getCalledFunction() hits), the algorithm does nothing special for generics—they already appear as direct edges in step 1 of each iteration.<br>
+    - Resolving each indirect <code>call %p(...)</code> by looking up the final points-to set <code>pts[%p]</code> and adding an edge to every function in it.<br>
+    <br>Because monomorphized generic calls show up as call @foo_u32 or call @foo_String (i.e. direct <code>getCalledFunction()</code> hits), the algorithm does nothing special for generics—they already appear as direct edges in step 1 of each iteration.<br>
     </p>
   </div>
   
