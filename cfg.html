@@ -78,10 +78,19 @@
   <main>
     <h1>Control-Flow Graph Construction</h1>
 
-```
 <h2>Problem definition</h2>
 <div class="box">
-  <p>A Control-Flow Graph (CFG) represents all possible paths through a program’s execution. Each node is a <b>basic block</b>—a straight-line code sequence with one entry and one exit. Directed edges show jumps or branch targets. There is one <b>entry</b> block where control starts, and one <b>exit</b> block where control leaves. Building a CFG is purely syntactic, so it is <b>decidable</b>: every jump target is explicit, and the process always finishes with a perfectly accurate graph.</p>
+  <p>A control-flow graph (CFG) is a representation, using graph notation, of all paths that might be traversed through a program during its execution. 
+    <br>In a control-flow graph each node in the graph represents a basic block, i.e. a straight-line sequence of code with a single entry point and a single exit point, where no branches or jumps occur within the block. Directed edges are used to represent jumps in the control flow. 
+    <br>There are, in most presentations, two specially designated blocks: the entry block, through which control enters into the flow graph, and the exit block, through which all control flow leaves. 
+    <br>Building a CFG is purely a syntatic process, we split code into basic blocks and link them based on the branch or jump instruction we see. <br><br>Which makes it a decidable (meaning we can achieve a perfectly accurate CFG) because:
+<br>
+<br>1. We only look at each instruction once:
+<br>- Scan the code top to bottom to identify basic block boundaries (leaders) and terminators (br, switch, return, etc)
+<br>- No recursive or infinite reasonning, every jump target is expliclty named in the text
+<br>2. Edges come directly from the code:
+<br>- For each block terminator:
+<br>-> We determine if it's a True/False/Exit branch
 </div>
 
 <h2>Plain text algorithm</h2>
@@ -124,7 +133,6 @@
 
 <h2>Pseudo-code</h2>
 <pre><code>for each basic block B:
-```
 
 identify leaders and split into blocks
 initialize B.predecessors = \[], B.successors = \[]
@@ -143,7 +151,6 @@ add edge (B → exit)
 
 record each edge in B.successors and target.predecessors</code></pre>
 
-```
 <h2>Mathematical Formulation</h2>
 <div class="box" style="background: var(--code); padding: 1rem;">
   <div style="font-size: 1.3em; text-align: center; margin-bottom: 1rem;">
@@ -162,7 +169,6 @@ record each edge in B.successors and target.predecessors</code></pre>
 <footer>
   <a href="index.html">&larr; Back to main page</a>
 </footer>
-```
 
   </main>
 </body>
