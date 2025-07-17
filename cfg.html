@@ -116,9 +116,9 @@
       <strong>Link edges:</strong>
       <ul>
         <li>For each block <code>B</code>, examine its terminator:</li>
-        <li>• <em>Unconditional</em> <code>br L</code>: add edge <code>(B → L)</code>.</li>
-        <li>• <em>Conditional</em> <code>br i1 c, T, F</code>: add edges <code>(B → T)</code> and <code>(B → F)</code>.</li>
-        <li>• <em>Return</em>: if using a dummy exit, add edge <code>(B → exit)</code>; otherwise leave <code>B.successors</code> empty.</li>
+        <li> <em>Unconditional</em> <code>br L</code>: add edge <code>(B → L)</code>.</li>
+        <li> <em>Conditional</em> <code>br i1 c, T, F</code>: add edges <code>(B → T)</code> and <code>(B → F)</code>.</li>
+        <li> <em>Return</em>: if using a dummy exit, add edge <code>(B → exit)</code>; otherwise leave <code>B.successors</code> empty.</li>
         <li>Record each connection in both <code>successors</code> and <code>predecessors</code>.</li>
       </ul>
     </li>
