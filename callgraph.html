@@ -70,7 +70,7 @@ footer{text-align:center;margin-top:3.5rem;font-size:.85rem}
   <h2>Problem definition</h2>
   <div class="box">
     <p>A call graph is an artifact produced by program analysis tools to record the <b>relationships between a function and the functions it calls</b>. Building a callgraph,  like many static analysis, is known to be an <b>undecidable</b> problem, meaning there is no perfect solution to build a perfect static callgraph. It relies on tricks and techniques to approximate the best callgraph possible. 
-    <br><br>Numerous techniques exist to improve callgraph generation at compile time, such as <b>Reach Analysis</b>b>, <b>Class Hierarchy Analysis</b>, <b>Rapid type Analysis</b>, etc. <br>Most of these techniques are useful in an Object Oriented program paradigm, since this tool focuses more on Rust the solution differs a bit. (Maybe in the future supports for OOP languages will be added)<br>
+    <br><br>Numerous techniques exist to improve callgraph generation at compile time, such as <b>Reach Analysis</b>, <b>Class Hierarchy Analysis</b>, <b>Rapid type Analysis</b>, etc. <br>Most of these techniques are useful in an Object Oriented program paradigm, since this tool focuses more on Rust the solution differs a bit. (Maybe in the future supports for OOP languages will be added)<br>
     <br>Call-graph analysis on Rust’s LLVM IR is easier because:<br>
     - Generics are monomorphised → almost every call is a direct <code>call @func_name</code>, not a virtual or template dispatch.<br>
     - No class inheritance tree → you don’t need CHA or RTA; there’s no subtype hierarchy to walk.<br>
