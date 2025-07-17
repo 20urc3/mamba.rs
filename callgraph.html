@@ -140,25 +140,25 @@ footer{text-align:center;margin-top:3.5rem;font-size:.85rem}
            if any edge new   repeat outer loop</code></pre>
 
   <h2>Mathematical Formulation</h2>
-  <div class="box" style="background:var(--code)">
-    <p><em>Notation.</em></p>
+  <div class="box" style="background:var(--code); padding:1rem;">
+    <div style="font-size:1.2em; text-align:center; margin-bottom:1rem;">
+      <pre><code>P*  =  lfp<sub>P</sub>( v ↦ Seeds(v) ∪ ⋃<sub>(u,v)∈E</sub> P(u) )</code></pre>
+      <pre><code>CG = { ( caller(c), t ) │ c∈C,
+           t ∈ { callee(c) }        if c is direct
+             ∪ P*( op(c) )         if c is indirect }</code></pre>
+    </div>
+    <p><em>Notation:</em></p>
     <ul>
-      <li><strong>F</strong> — set of all LLVM functions</li>
-      <li><strong>C</strong> — set of all call‑site instructions</li>
-      <li><code>caller(c)</code> — function containing call‑site <cite>c</cite></li>
-      <li><code>callee(c)</code> — direct callee when <cite>c</cite> is direct</li>
-      <li><code>op(c)</code>    — SSA value holding the callee pointer</li>
+      <li><strong>F</strong> — set of all LLVM functions</li>
+      <li><strong>C</strong> — set of all call-site instructions</li>
+      <li><code>caller(c)</code> — the function containing call-site <cite>c</cite></li>
+      <li><code>callee(c)</code> — the direct target when <cite>c</cite> is a direct call</li>
+      <li><code>op(c)</code> — the SSA value that holds the callee pointer for <cite>c</cite></li>
+      <li><strong>Seeds(v)</strong> — initial set of functions whose addresses flow into variable <code>v</code></li>
+      <li><strong>E</strong> — set of pointer-copy edges (store, load, bitcast, getelementptr, φ, parameter passing)</li>
+      <li><strong>P*</strong> — the least fixed point of the mapping <code>P ↦ v ↦ Seeds(v) ∪ ⋃<sub>(u,v)∈E</sub> P(u)</code></li>
+      <li><strong>CG</strong> — the final call graph as a set of (caller, callee) edges</li>
     </ul>
-
-<pre><code>P*  =  lfp_P ( v ↦ Seeds(v) ∪ ⋃_{(u,v)∈E} P(u) )
-</code></pre>
-    <p style="margin-top:-.6rem">where <em>E</em> is the set of pointer‑copy edges.</p>
-
-<pre><code>CG = { ( caller(c) , t ) │ c∈C ,
-        t ∈  { callee(c) }          if c direct
-            ∪ P*( op(c) )           if c indirect }
-</code></pre>
-    <p style="margin-top:-.6rem">Each pair (<code>caller</code>, <code>t</code>) forms a call‑graph edge.</p>
   </div>
 
   <footer>
