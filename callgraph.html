@@ -94,7 +94,7 @@
         - Every function whose address is “taken” and stored in some variable (raw function pointers).<br>
     - Propagating those seeds along all pointer‐flow edges (loads, stores, bitcasts, φ-nodes, GEPs).<br>
     - Resolving each indirect <code>call %p(...)</code> by looking up the final points-to set <code>pts[%p]</code> and adding an edge to every function in it.<br>
-    <br>Because monomorphized generic calls show up as call @foo_u32 or call @foo_String (i.e. direct <code>getCalledFunction()</code> hits), the algorithm does nothing special for generics—they already appear as direct edges in step 1 of each iteration.<br>
+    <br>Because monomorphized generic calls show up as call @foo_u32 or call @foo_String (i.e. direct <code>getCalledFunction()</code> hits), the algorithm does nothing special for generics: they already appear as direct edges in step 1 of each iteration.<br>
     </p>
   </div>
 
