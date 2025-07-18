@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -78,107 +77,136 @@
   <main>
     <h1>Control-Flow Graph Construction</h1>
 
-<h2>Problem definition</h2>
-<div class="box">
-  <p>A control-flow graph (CFG) is a representation, using graph notation, of all paths that might be traversed through a program during its execution. 
-    <br><br>In a control-flow graph each node in the graph represents a basic block, i.e. a straight-line sequence of code with a single entry point and a single exit point, where no branches or jumps occur within the block. 
-    <br><br>Directed edges are used to represent jumps in the control flow. There are, in most presentations, two specially designated blocks: the entry block, through which control enters into the flow graph, and the exit block, through which all control flow leaves. 
-    <br><br>Building a CFG is purely a syntatic process, we split code into basic blocks and link them based on the branch or jump instruction we see. <br><br>Which makes it a decidable (meaning we can achieve a perfectly accurate CFG) because:
-<br>
-  <ol>
-    <li>
-      <strong>We only look at each instruction once:</strong>
-        <ul>
-           <li> Scan the code top to bottom to identify basic block boundaries (leaders) and terminators (br, switch, return, etc)
-           <li> No recursive or infinite reasonning, every jump target is expliclty named in the text
-        </ul>
-      </li>
-    <li>
-      <strong>Edges come directly from the code:</strong>
-        <ul>
-          <li> For each block terminator: We determine if it's a True/False/Exit branch 
-        </ul>
-    </li>
-  </ol>
-</div>
+    <h2>Problem definition</h2>
+    <div class="box">
+      <p>A control-flow graph (CFG) is a representation, using graph notation, of all paths that might be traversed through a program during its execution. 
+        <br><br>In a control-flow graph each node in the graph represents a basic block, i.e. a straight-line sequence of code with a single entry point and a single exit point, where no branches or jumps occur within the block. 
+        <br><br>Directed edges are used to represent jumps in the control flow. There are, in most presentations, two specially designated blocks: the entry block, through which control enters into the flow graph, and the exit block, through which all control flow leaves. 
+        <br><br>Building a CFG is purely a syntactic process, we split code into basic blocks and link them based on the branch or jump instruction we see. <br><br>This makes it decidable (meaning we can achieve a perfectly accurate CFG) because:
+      <br>
+      <ol>
+        <li>
+          <strong>We only look at each instruction once:</strong>
+            <ul>
+               <li>Scan the code top to bottom to identify basic block boundaries (leaders) and terminators (<code>br</code>, <code>switch</code>, <code>return</code>, etc.).</li>
+               <li>No recursive or infinite reasoning—every jump target is explicitly named in the text.</li>
+            </ul>
+          </li>
+        <li>
+          <strong>Edges come directly from the code:</strong>
+            <ul>
+              <li>For each block terminator, we determine its type (true branch, false branch, exit, etc.) and link blocks accordingly.</li>
+            </ul>
+        </li>
+      </ol>
+    </div>
 
-<h2>Plain text algorithm</h2>
-<div class="box">
-  <p>We perform these phases in one pass over all basic blocks:</p>
-  <ol>
-    <li>
-      <strong>Identify blocks:</strong>
+    <h2>Plain text algorithm</h2>
+    <div class="box">
+      <p>We perform these phases in one pass over all basic blocks:</p>
+      <ol>
+        <li>
+          <strong>Identify blocks:</strong>
+          <ul>
+            <li>Scan the program from top to bottom, marking any instruction that is the first in the function, a target of a branch, or immediately after a terminator as a <code>leader</code>.</li>
+            <li>Partition the instructions into <code>BasicBlock BLOCK</code> nodes so each <code>BLOCK</code> has one entry (its first instruction) and one exit (its terminator instruction).</li>
+          </ul>
+        </li>
+        <li>
+          <strong>Initialize:</strong>
+          <ul>
+            <li>For each <code>BasicBlock BLOCK</code>, set <code>BLOCK.predecessors = []</code> and <code>BLOCK.successors = []</code>.</li>
+            <li>Set <code>ENTRY_BLOCK</code> to the first <code>BasicBlock</code> in the function.</li>
+            <li>Optionally, create a dummy exit block named <code>EXIT_BLOCK</code> with empty lists.</li>
+          </ul>
+        </li>
+        <li>
+          <strong>Link edges:</strong>
+          <ul>
+            <li>For each <code>BasicBlock BLOCK</code>, let <code>TERMINATOR</code> be the last instruction in <code>BLOCK</code>.</li>
+            <li><em>Unconditional branch:</em> if <code>TERMINATOR</code> is <code>br TARGET</code>, where <code>TARGET</code> is the label of the jump target,
+              <ul>
+                <li>Add <code>TARGET</code> to <code>BLOCK.successors</code>.</li>
+                <li>Add <code>BLOCK</code> to <code>TARGET.predecessors</code>.</li>
+              </ul>
+            </li>
+            <li><em>Conditional branch:</em> if <code>TERMINATOR</code> is <code>br i1 CONDITION, TRUE_TARGET, FALSE_TARGET</code>,
+              <ul>
+                <li><code>CONDITION</code> is the boolean value being tested.</li>
+                <li><code>TRUE_TARGET</code> is the label when <code>CONDITION</code> is true.</li>
+                <li><code>FALSE_TARGET</code> is the label when <code>CONDITION</code> is false.</li>
+                <li>Add <code>TRUE_TARGET</code> and <code>FALSE_TARGET</code> to <code>BLOCK.successors</code>, and add <code>BLOCK</code> to both <code>TRUE_TARGET.predecessors</code> and <code>FALSE_TARGET.predecessors</code>.</li>
+              </ul>
+            </li>
+            <li><em>Return:</em> if <code>TERMINATOR</code> is <code>return</code>,
+              <ul>
+                <li>If <code>EXIT_BLOCK</code> exists, add <code>EXIT_BLOCK</code> to <code>BLOCK.successors</code> and add <code>BLOCK</code> to <code>EXIT_BLOCK.predecessors</code>.</li>
+                <li>Otherwise, leave <code>BLOCK.successors</code> empty so that <code>BLOCK</code> is treated as an exit block.</li>
+              </ul>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <strong>Complete:</strong>
+          <ul>
+            <li><code>ENTRY_BLOCK</code> is the CFG’s start.</li>
+            <li>Any <code>BasicBlock</code> whose <code>successors</code> list is empty is an exit block (or it is <code>EXIT_BLOCK</code> if created).</li>
+          </ul>
+        </li>
+      </ol>
+    </div>
+
+    <h2>Pseudo-code</h2>
+    <pre><code>for each BasicBlock BLOCK in the function:
+  // Initialization phase
+  BLOCK.predecessors = []
+  BLOCK.successors   = []
+if using a dummy exit:
+  create BasicBlock EXIT_BLOCK
+  EXIT_BLOCK.predecessors = []
+  EXIT_BLOCK.successors   = []
+ENTRY_BLOCK = the first BasicBlock
+
+for each BasicBlock BLOCK:
+  // Determine the control flow edges from the terminator
+  let TERMINATOR = BLOCK.terminator
+  if TERMINATOR is "br TARGET":
+    // Unconditional branch to TARGET
+    BLOCK.successors.push(TARGET)
+    TARGET.predecessors.push(BLOCK)
+  else if TERMINATOR is "br i1 CONDITION, TRUE_TARGET, FALSE_TARGET":
+    // Conditional branch on CONDITION
+    // TRUE_TARGET when CONDITION is true
+    // FALSE_TARGET when CONDITION is false
+    BLOCK.successors.push(TRUE_TARGET)
+    TRUE_TARGET.predecessors.push(BLOCK)
+    BLOCK.successors.push(FALSE_TARGET)
+    FALSE_TARGET.predecessors.push(BLOCK)
+  else if TERMINATOR is "return":
+    // Return instruction
+    if EXIT_BLOCK exists:
+      BLOCK.successors.push(EXIT_BLOCK)
+      EXIT_BLOCK.predecessors.push(BLOCK)
+    // else, BLOCK.successors remains empty</code></pre>
+
+    <h2>Mathematical Formulation</h2>
+    <div class="box" style="background: var(--code); padding: 1rem;">
+      <div style="font-size: 1.3em; text-align: center; margin-bottom: 1rem;">
+        $$\mathrm{CFG} = (B, E, \mathit{entry}, \mathit{exit})$$
+        $$E = \{\,(b, b') \mid b,b' \in B,\; b' \text{ is a target of } b\}'\text{s terminator}\}$$
+      </div>
+      <p><em>Notation:</em></p>
       <ul>
-        <li>Scan code top-to-bottom, marking leaders (function start, branch targets, fall-throughs).</li>
-        <li>Partition the code into basic blocks so each has a single entry and exit.</li>
+        <li><strong>B</strong> — set of all basic blocks</li>
+        <li><strong>E</strong> — set of directed edges between blocks</li>
+        <li><strong>entry</strong> — the start block in <strong>B</strong></li>
+        <li><strong>exit</strong> — the end block (or dummy) in <strong>B</strong></li>
       </ul>
-    </li>
-    <li>
-      <strong>Initialize:</strong>
-      <ul>
-        <li>Give each block empty <code>predecessors</code> and <code>successors</code> lists.</li>
-        <li>Choose the first block as the entry.</li>
-        <li>Optionally, create a dummy exit block.</li>
-      </ul>
-    </li>
-    <li>
-      <strong>Link edges:</strong>
-      <ul>
-        <li>For each block <code>B</code>, examine its terminator:</li>
-        <li> <em>Unconditional</em> <code>br L</code>: add edge <code>(B → L)</code>.</li>
-        <li> <em>Conditional</em> <code>br i1 c, T, F</code>: add edges <code>(B → T)</code> and <code>(B → F)</code>.</li>
-        <li> <em>Return</em>: if using a dummy exit, add edge <code>(B → exit)</code>; otherwise leave <code>B.successors</code> empty.</li>
-        <li>Record each connection in both <code>successors</code> and <code>predecessors</code>.</li>
-      </ul>
-    </li>
-    <li>
-      <strong>Complete:</strong>
-      <ul>
-        <li>The entry block is the CFG’s start; any block with no successors is an exit (or the dummy exit).</li>
-      </ul>
-    </li>
-  </ol>
-</div>
+    </div>
 
-<h2>Pseudo-code</h2>
-<pre><code>for each basic block B:
-
-identify leaders and split into blocks
-initialize B.predecessors = \[], B.successors = \[]
-choose entry = first block
-optionally create dummy exit block
-
-for each block B:
-let term = B.terminator
-if term is "br L":
-add edge (B → L)
-if term is "br i1 c, T, F":
-add edges (B → T), (B → F)
-if term is "return":
-if dummy exit exists:
-add edge (B → exit)
-
-record each edge in B.successors and target.predecessors</code></pre>
-
-<h2>Mathematical Formulation</h2>
-<div class="box" style="background: var(--code); padding: 1rem;">
-  <div style="font-size: 1.3em; text-align: center; margin-bottom: 1rem;">
-    $$\mathrm{CFG} = (B, E, \mathit{entry}, \mathit{exit})$$
-    $$E = \{\,(b, b') \mid b,b' \in B,\; b' \text{ is a target of } b\}'\text{s terminator}\}$$
-  </div>
-  <p><em>Notation:</em></p>
-  <ul>
-    <li><strong>B</strong> — set of all basic blocks</li>
-    <li><strong>E</strong> — set of directed edges between blocks</li>
-    <li><strong>entry</strong> — the start block in <strong>B</strong></li>
-    <li><strong>exit</strong> — the end block (or dummy) in <strong>B</strong></li>
-  </ul>
-</div>
-
-<footer>
-  <a href="index.html">&larr; Back to main page</a>
-</footer>
-
+    <footer>
+      <a href="index.html">&larr; Back to main page</a>
+    </footer>
   </main>
 </body>
 </html>
