@@ -87,14 +87,14 @@
 <br>
   <ol>
     <li>
-      <strong>1. We only look at each instruction once:</strong>
+      <strong>We only look at each instruction once:</strong>
         <ul>
            <li> Scan the code top to bottom to identify basic block boundaries (leaders) and terminators (br, switch, return, etc)
            <li> No recursive or infinite reasonning, every jump target is expliclty named in the text
         </ul>
       </li>
     <li>
-      <strong>2. Edges come directly from the code:</strong>
+      <strong>Edges come directly from the code:</strong>
         <ul>
           <li> For each block terminator: We determine if it's a True/False/Exit branch 
         </ul>
