@@ -81,16 +81,25 @@
 <h2>Problem definition</h2>
 <div class="box">
   <p>A control-flow graph (CFG) is a representation, using graph notation, of all paths that might be traversed through a program during its execution. 
-    <br>In a control-flow graph each node in the graph represents a basic block, i.e. a straight-line sequence of code with a single entry point and a single exit point, where no branches or jumps occur within the block. Directed edges are used to represent jumps in the control flow. 
-    <br>There are, in most presentations, two specially designated blocks: the entry block, through which control enters into the flow graph, and the exit block, through which all control flow leaves. 
-    <br>Building a CFG is purely a syntatic process, we split code into basic blocks and link them based on the branch or jump instruction we see. <br><br>Which makes it a decidable (meaning we can achieve a perfectly accurate CFG) because:
+    <br><br>In a control-flow graph each node in the graph represents a basic block, i.e. a straight-line sequence of code with a single entry point and a single exit point, where no branches or jumps occur within the block. 
+    <br><br>Directed edges are used to represent jumps in the control flow. There are, in most presentations, two specially designated blocks: the entry block, through which control enters into the flow graph, and the exit block, through which all control flow leaves. 
+    <br><br>Building a CFG is purely a syntatic process, we split code into basic blocks and link them based on the branch or jump instruction we see. <br><br>Which makes it a decidable (meaning we can achieve a perfectly accurate CFG) because:
 <br>
-<br>1. We only look at each instruction once:
-<br>- Scan the code top to bottom to identify basic block boundaries (leaders) and terminators (br, switch, return, etc)
-<br>- No recursive or infinite reasonning, every jump target is expliclty named in the text
-<br>2. Edges come directly from the code:
-<br>- For each block terminator:
-<br>-> We determine if it's a True/False/Exit branch
+  <ol>
+    <li>
+      <strong>1. We only look at each instruction once:</strong>
+        <ul>
+           <li> Scan the code top to bottom to identify basic block boundaries (leaders) and terminators (br, switch, return, etc)
+           <li> No recursive or infinite reasonning, every jump target is expliclty named in the text
+        </ul>
+      </li>
+    <li>
+      <strong>2. Edges come directly from the code:</strong>
+        <ul>
+          <li> For each block terminator: We determine if it's a True/False/Exit branch 
+        </ul>
+    </li>
+  </ol>
 </div>
 
 <h2>Plain text algorithm</h2>
