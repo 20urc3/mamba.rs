@@ -198,11 +198,22 @@ for each BasicBlock BLOCK:
       <p>Reading: E is the collection of all ordered pairs (b,b′)(b,b′) where control can go directly from block bb to block b′b′ (because bb’s terminator says “jump to b′b′”). <br><br></p>
       <p><em>Notation:</em></p>
       <ul>
-        <li><strong>B</strong> — set of all basic blocks</li>
-        <li><strong>E</strong> — set of directed edges between blocks</li>
-        <li><strong>entry</strong> — the start block in <strong>B</strong></li>
-        <li><strong>exit</strong> — the end block (or dummy) in <strong>B</strong></li>
-      </ul>
+    <li><strong>CFG</strong> — The control‑flow graph</li>
+    <li><strong>=</strong> — “equals” or “is defined as”</li>
+    <li><strong>( , )</strong> — An ordered 4‑tuple</li>
+    <li><strong>B</strong> — The set of all basic blocks in the function</li>
+    <li><strong>,</strong> — Separates tuple components</li>
+    <li><strong>E</strong> — The set of directed edges between blocks</li>
+    <li><strong>entry</strong> — The special block where control begins</li>
+    <li><strong>exit</strong> — The special block where control ends</li>
+    <li><strong>=</strong> — Defines E in set‑comprehension form</li>
+    <li><strong>{ … }</strong> — A set of ordered pairs <code>(b, b')</code></li>
+    <li><strong>(b, b')</strong> — An edge from block <code>b</code> to block <code>b'</code></li>
+    <li><strong>|</strong> (“such that”) — Introduces the conditions for membership in <strong>E</strong></li>
+    <li><strong>b, b' ∈ B</strong> — Both <code>b</code> and <code>b'</code> are basic blocks in <strong>B</strong></li>
+    <li><strong>,</strong> — “and” (both conditions must hold)</li>
+    <li><strong>b' is a jump target of b’s terminator</strong> — Block <code>b'</code> appears as one of the labels in the last instruction (the terminator) of block <code>b</code></li>
+  </ul>
     </div>
 
     <footer>
