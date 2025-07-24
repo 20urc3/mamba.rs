@@ -162,15 +162,23 @@
       </div>
       <p><em>Notation:</em></p>
       <ul>
-        <li><strong>F</strong> — set of all LLVM functions</li>
-        <li><strong>C</strong> — set of all call-site instructions</li>
-        <li><code>caller(c)</code> — function containing call-site <cite>c</cite></li>
-        <li><code>callee(c)</code> — direct target when <cite>c</cite> is a direct call</li>
-        <li><code>op(c)</code> — SSA value holding the callee pointer for <cite>c</cite></li>
-        <li><strong>Seeds(v)</strong> — initial set of functions whose addresses flow into variable <code>v</code></li>
-        <li><strong>E</strong> — set of pointer-copy edges (store, load, bitcast, getelementptr, φ, parameter passing)</li>
-        <li><strong>P*</strong> — the least fixed point of <code>P ↦ [v ↦ Seeds(v) ∪ ⋃<sub>(u,v)∈E</sub> P(u)]</code></li>
-        <li><strong>CG</strong> — the final call graph as a set of (caller, callee) edges</li>
+        <li><strong>CG</strong> — The call graph—the set of caller→callee edges</li>
+        <li><strong>=</strong> — “equals” or “is defined as”</li>
+        <li><strong>{ … }</strong> — A set</li>
+        <li><strong>( , )</strong> — 	An ordered pair or tuple</li>
+        <li><strong>caller</strong> — A function mapping each call‑site c to the function that contains it</li>
+        <li><strong>(c)</strong> — 	The call‑site being considered</li>
+        <li><strong>t</strong> —  A variable ranging over possible callee functions</li>
+        <li><strong>∣ (“such that”)</strong> — 	Introduces the conditions that select which pairs belong to the set</li>
+        <li><strong>c ∈ C</strong> — The call‑site c is one element of the set C of all call‑sites</li>
+        <li><strong>,</strong> — 	“and” (both conditions must hold)</li>
+        <li><strong>t ∈ …</strong> — 	The target t must come from the following case‑analysis result</li>
+        <li><strong>{…​</strong> — A two‑branch definition depending on whether c is direct or indirect</li>
+        <li><strong>{callee(c)}</strong> — If c is direct, the singleton set containing the statically resolved callee</li>
+        <li><strong>{…​</strong> — A two‑branch definition depending on whether c is direct or indirect</li>
+        <li><strong>P*</strong> — The least fixed point of the points‑to mapping PP</li>
+        <li><strong>op(c)</strong> — The SSA value (pointer) used by the indirect call at call‑site c</li>
+        <li><strong>P*(op(c))/strong> — “All functions that the pointer op(c) may refer to”</li>
       </ul>
     </div>
 
