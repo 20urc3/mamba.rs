@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mamba — Dominator Analysis</title>
+  <!-- MathJax for formula rendering -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$']]
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <style>
+    /*****  PALETTE  *****/
+    :root {
+      --accent:#0a84ff;
+      --text:#1c1c1e;
+      --bg:#ffffff;
+      --card:#f3f4f6;
+      --code:#f5f5f7;
+      --max:820px;
+    }
+    @media(prefers-color-scheme:dark){
+      :root{
+        --text:#e7e7e7;
+        --bg:#26262a;
+        --card:#323236;
+        --code:#2a2a2e;
+      }
+    }
+    /*****  RESET & BASE  *****/
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{
+      font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+      background:var(--bg);
+      color:var(--text);
+      line-height:1.7;
+      display:flex;
+      justify-content:center;
+      padding:3rem 1rem;
+    }
+    main{max-width:var(--max);width:100%}
+    /*****  TYPOGRAPHY  *****/
+    h1{font-size:2.4rem;font-weight:700;text-align:center;margin-bottom:1.5rem}
+    h2{font-size:1.6rem;font-weight:600;text-align:center;margin:2.5rem 0 1.2rem}
+    p,li{font-size:1rem;margin-bottom:.6rem}
+    /*****  COMPONENTS  *****/
+    .box{
+      background:var(--card);
+      padding:1.8rem;
+      border-radius:24px;
+      box-shadow:0 4px 12px rgba(0,0,0,.05);
+      margin-bottom:2rem;
+    }
+    pre{
+      background:var(--code);
+      padding:1.5rem;
+      border-radius:20px;
+      overflow:auto;
+      font-size:.9rem;
+      margin-bottom:2rem;
+    }
+    code{font-family:"SFMono-Regular",Consolas,Menlo,monospace;tab-size:2}
+    ul{padding-left:1.4rem;list-style:square}
+    ol{margin-left:1.2rem}
+    a{color:var(--accent);text-decoration:none;font-weight:500}
+    a:hover{text-decoration:underline}
+    footer{text-align:center;margin-top:3.5rem;font-size:.85rem}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Dominator Tree Construction</h1>
+
+    <h2>Problem definition</h2>
+    <div class="box">
+      <p>A <strong>dominator</strong> of a basic block <code>n</code> in a CFG is any block that appears on every path from the <strong>entry</strong> to <code>n</code>.  
+      Finding dominators is a fundamental, <strong>decidable</strong> analysis used for optimizations like code motion, SSA construction, and control dependence.</p>
+      <p>The dominator sets satisfy:</p>
+      <ul>
+        <li>The entry block <code>n₀</code> dominates only itself.</li>
+        <li>Every other block <code>n</code> is dominated by itself plus the common dominators of its immediate predecessors.</li>
+      </ul>
+    </div>
+
+    <h2>Plain text algorithm</h2>
+    <div class="box">
+      <p>We compute dominators by repeating these steps until nothing changes:</p>
+      <ol>
+        <li>
+          <strong>Initialization:</strong>
+          <ul>
+            <li>Set <code>Dom(n₀) = {n₀}</code>.</li>
+            <li>For every other block <code>n</code>, set <code>Dom(n) = B</code> (the set of all blocks).</li>
+          </ul>
+        </li>
+        <li>
+          <strong>Update:</strong>
+          <ul>
+            <li>For each non‑entry block <code>n</code>:
+              <ol>
+                <li>Gather the dominator sets of all predecessors <code>p ∈ preds(n)</code>.</li>
+                <li>Intersect them to get the common dominators.</li>
+                <li>Union the result with <code>{n}</code> (each block dominates itself).</li>
+                <li>Set this as the new <code>Dom(n)</code>.</li>
+              </ol>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <strong>Fixed‑point check:</strong>
+          <ul>
+            <li>If any <code>Dom(n)</code> changed in this pass, repeat the <em>Update</em> step.</li>
+            <li>Otherwise, stop—every dominator set is now correct.</li>
+          </ul>
+        </li>
+      </ol>
+    </div>
+
+    <h2>Pseudo‑code</h2>
+    <pre><code>let B = set of all basic blocks
+let ENTRY = entry block n₀
+
+// Initialization
+Dom[ENTRY] = { ENTRY }
+for each n in B \ {ENTRY}:
+  Dom[n] = B
+
+// Fixed-point iteration
+changed = true
+while changed:
+  changed = false
+  for each n in B \ {ENTRY}:
+    newSet = { n }
+    intersect = B
+    for each p in preds(n):
+      intersect = intersect ∩ Dom[p]
+    newSet = newSet ∪ intersect
+    if newSet ≠ Dom[n]:
+      Dom[n] = newSet
+      changed = true</code></pre>
+
+    <h2>Mathematical Formulation</h2>
+    <div class="box" style="background:var(--code);padding:1rem;">
+      <div style="font-size:1.3em;text-align:center;margin-bottom:1rem;">
+        $$\mathrm{Dom}(n) =
+        \begin{cases}
+          \{n\} & \text{if }n = n_{0},\\[6pt]
+          \{n\}\;\cup\;\displaystyle\bigcap_{p\in\mathrm{preds}(n)}\mathrm{Dom}(p)
+                 & \text{otherwise.}
+        \end{cases}$$
+      </div>
+      <p><em>Notation:</em></p>
+      <ul>
+        <li><strong>B</strong> — set of all basic blocks</li>
+        <li><strong>n₀</strong> — the entry block</li>
+        <li><code>Dom(n)</code> — dominator set of block <code>n</code></li>
+        <li><code>preds(n)</code> — set of immediate predecessors of <code>n</code></li>
+        <li><strong>∩</strong> — set intersection (“common to all”)</li>
+        <li><strong>∪</strong> — set union (“combine elements”)</li>
+      </ul>
+    </div>
+
+    <footer>
+      <a href="index.html">&larr; Back to main page</a>
+    </footer>
+  </main>
+</body>
+</html>
