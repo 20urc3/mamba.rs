@@ -166,6 +166,95 @@ while changed:
       </ul>
     </div>
 
+    <h2>Postdominator Analysis</h2>
+    <div class="box">
+      <p>A <strong>postdominator</strong> of a basic block <code>n</code> in a CFG is any block that appears on every path <em>from</em> <code>n</code> <em>to</em> the <strong>exit</strong>.  
+      This analysis is <strong>decidable</strong> and underpins control‑dependence, slicing, and safe cleanup insertions.</p>
+      <p>The postdominator sets satisfy:</p>
+      <ul>
+        <li>The exit block <code>e₀</code> postdominates only itself.</li>
+        <li>Every other block <code>n</code> is postdominated by itself plus the common postdominators of its immediate successors.</li>
+      </ul>
+    </div>
+
+    <h2>Plain text algorithm</h2>
+    <div class="box">
+      <p>We compute postdominators by repeating until convergence:</p>
+      <ol>
+        <li>
+          <strong>Initialization:</strong>
+          <ul>
+            <li>Set <code>pDom(e₀) = {e₀}</code>, where <code>e₀</code> is the exit block.</li>
+            <li>For every other block <code>n</code>, set <code>pDom(n) = B</code> (all blocks).</li>
+          </ul>
+        </li>
+        <li>
+          <strong>Update:</strong>
+          <ul>
+            <li>For each non‑exit block <code>n</code>:
+              <ol>
+                <li>Collect each successor’s postdominator set <code>pDom(s)</code> for all <code>s ∈ succs(n)</code>.</li>
+                <li>Intersect them to find common postdominators.</li>
+                <li>Union that with <code>{n}</code> (every block postdominates itself).</li>
+                <li>Assign the result to <code>pDom(n)</code>.</li>
+              </ol>
+            </li>
+          </ul>
+        </li>
+        <li>
+          <strong>Fixed‑point check:</strong>
+          <ul>
+            <li>If any <code>pDom(n)</code> changed, repeat <em>Update</em>.</li>
+            <li>Else, stop—postdominators are stable.</li>
+          </ul>
+        </li>
+      </ol>
+    </div>
+
+    <h2>Pseudo‑code</h2>
+    <pre><code>let B = set of all basic blocks
+let EXIT = exit block e₀
+
+// Initialization
+pDom[EXIT] = { EXIT }
+for each n in B \ {EXIT}:
+  pDom[n] = B
+
+// Fixed-point iteration
+changed = true
+while changed:
+  changed = false
+  for each n in B \ {EXIT}:
+    newSet = { n }
+    intersect = B
+    for each s in succs(n):
+      intersect = intersect ∩ pDom[s]
+    newSet = newSet ∪ intersect
+    if newSet ≠ pDom[n]:
+      pDom[n] = newSet
+      changed = true</code></pre>
+
+    <h2>Mathematical Formulation</h2>
+    <div class="box" style="background:var(--code);padding:1rem;">
+      <div style="font-size:1.3em;text-align:center;margin-bottom:1rem;">
+        $$\mathrm{pDom}(n) =
+        \begin{cases}
+          \{n\} & \text{if }n = e_{0},\\[6pt]
+          \{n\}\;\cup\;\displaystyle\bigcap_{s\in\mathrm{succs}(n)}\mathrm{pDom}(s)
+                 & \text{otherwise.}
+        \end{cases}$$
+      </div>
+      <p><em>Notation:</em></p>
+      <ul>
+        <li><strong>B</strong> — set of all basic blocks</li>
+        <li><strong>e₀</strong> — the exit block</li>
+        <li><code>pDom(n)</code> — postdominator set of block <code>n</code></li>
+        <li><code>succs(n)</code> — set of immediate successors of <code>n</code></li>
+        <li><strong>∩</strong> — intersection (common to all)</li>
+        <li><strong>∪</strong> — union (combine elements)</li>
+      </ul>
+    </div>
+    
     <footer>
       <a href="index.html">&larr; Back to main page</a>
     </footer>
