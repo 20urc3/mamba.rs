@@ -2,60 +2,160 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Mamba — Memory SSA Construction</title>
   <!-- MathJax for formula rendering -->
   <script>
     window.MathJax = {
       tex: {
-        inlineMath: [['\\(', '\\)']],
-        displayMath: [['\\[', '\\]']]
+        inlineMath: [['\\(','\\)']],
+        displayMath: [['\\[','\\]']]
       },
       svg: { fontCache: 'global' }
     };
   </script>
   <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
   <style>
-    /* palette, reset, typography, components as before */
-    :root{--accent:#0a84ff;--text:#1c1c1e;--bg:#ffffff;--card:#f3f4f6;--code:#f5f5f7;--max:820px;}
-    @media(prefers-color-scheme:dark){:root{--text:#e7e7e7;--bg:#26262a;--card:#323236;--code:#2a2a2e;}}
-    *{box-sizing:border-box;margin:0;padding:0} body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.7;display:flex;justify-content:center;padding:3rem 1rem;} main{max-width:var(--max);width:100%}
-    h1{font-size:2.4rem;font-weight:700;text-align:center;margin-bottom:1.5rem} h2{font-size:1.6rem;font-weight:600;text-align:center;margin:2.5rem 0 1.2rem} p,li{font-size:1rem;margin-bottom:.6rem}
-    .box{background:var(--card);padding:1.8rem;border-radius:24px;box-shadow:0 4px 12px rgba(0,0,0,.05);margin-bottom:2rem}
-    pre{background:var(--code);padding:1.5rem;border-radius:20px;overflow:auto;font-size:.9rem;margin-bottom:2rem}
-    code{font-family:"SFMono-Regular",Consolas,Menlo,monospace;tab-size:2} ul{padding-left:1.4rem;list-style:square} ol{margin-left:1.2rem}
-    a{color:var(--accent);text-decoration:none;font-weight:500} a:hover{text-decoration:underline} footer{text-align:center;margin-top:3.5rem;font-size:.85rem}
+    :root{
+      --accent:#0a84ff; --text:#1c1c1e; --bg:#ffffff;
+      --card:#f3f4f6; --code:#f5f5f7; --max:820px;
+    }
+    @media(prefers-color-scheme:dark){
+      :root{ --text:#e7e7e7; --bg:#26262a; --card:#323236; --code:#2a2a2e; }
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+         background:var(--bg);color:var(--text);line-height:1.7;
+         display:flex;justify-content:center;padding:3rem 1rem;}
+    main{max-width:var(--max);width:100%}
+    h1{font-size:2.4rem;font-weight:700;text-align:center;margin-bottom:1.5rem}
+    h2{font-size:1.6rem;font-weight:600;text-align:center;margin:2.5rem 0 1.2rem}
+    p,li{font-size:1rem;margin-bottom:.6rem}
+    .box{background:var(--card);padding:1.8rem;border-radius:24px;
+         box-shadow:0 4px 12px rgba(0,0,0,.05);margin-bottom:2rem}
+    pre{background:var(--code);padding:1.5rem;border-radius:20px;
+        overflow:auto;font-size:.9rem;margin-bottom:2rem}
+    code{font-family:"SFMono-Regular",Consolas,Menlo,monospace;tab-size:2}
+    ul{padding-left:1.4rem;list-style:square} ol{margin-left:1.2rem}
+    a{color:var(--accent);text-decoration:none;font-weight:500}
+    a:hover{text-decoration:underline}
+    footer{text-align:center;margin-top:3.5rem;font-size:.85rem}
   </style>
 </head>
 <body>
   <main>
     <h1>Memory SSA Construction</h1>
 
-    <!-- Problem definition, Plain text algorithm, Pseudo-code unchanged -->
+    <h2>Problem definition</h2>
+    <div class="box">
+      <p>LLVM IR uses SSA for registers but not for memory (<code>load</code>/<code>store</code>/<code>alloca</code>). This makes flow‑sensitive memory analyses (aliasing, LICM, call‑graph precision) expensive and imprecise.  
+      <strong>Memory SSA</strong> solves this by treating the entire memory state as one SSA variable:</p>
+      <ul>
+        <li>Insert <code>memφ</code> nodes at merge points to join memory versions.</li>
+        <li>Rename each <code>alloca</code> or <code>store</code> (definition) and each <code>load</code> (use) to a unique memory version.</li>
+      </ul>
+      <p>The result is a sparse, flow‑sensitive <em>def‑use graph</em> for memory, enabling precise pointer analysis, aggressive optimizations, and improved call‑graph resolution.</p>
+    </div>
+
+    <h2>Plain text algorithm</h2>
+    <div class="box">
+      <p>Build Memory SSA in two main phases:</p>
+      <ol>
+        <li>
+          <strong>Φ‑node placement:</strong>
+          <ul>
+            <li>Compute the CFG and its dominator tree.</li>
+            <li>Find all <strong>DefBlocks</strong> containing a memory definition (<code>alloca</code> or <code>store</code>).</li>
+            <li>Compute dominance frontiers <code>DF(d)</code> for each <code>d∈DefBlocks</code>.</li>
+            <li>Let <strong>MemPhiBlocks</strong> be the union of those frontiers; in each such block insert a <code>memφ</code> node.</li>
+          </ul>
+        </li>
+        <li>
+          <strong>Renaming (version assignment):</strong>
+          <ul>
+            <li>Initialize <code>versionStack</code> with the initial memory version <code>M0</code> at the entry block.</li>
+            <li>Traverse the dominator tree depth‑first:
+              <ul>
+                <li>If the block has a <code>memφ</code>, assign it a new version <code>Mφ</code> and push onto <code>versionStack</code>.</li>
+                <li>For each instruction in the block in order:
+                  <ul>
+                    <li><code>alloca</code> or <code>store</code>: assign a fresh version <code>Ms</code> and push onto <code>versionStack</code>.</li>
+                    <li><code>load</code>: rewrite its pointer to the current top of <code>versionStack</code>.</li>
+                  </ul>
+                </li>
+                <li>Recurse on children in the dominator tree.</li>
+                <li>After recursion, restore <code>versionStack</code> to its prior state.</li>
+              </ul>
+            </li>
+          </ul>
+        </li>
+      </ol>
+    </div>
+
+    <h2>Pseudo‑code</h2>
+    <pre><code>// Phase 1: Φ‑node placement
+computeCFG()
+computeDominatorTree()
+DefBlocks = { B | B contains alloca or store }
+MemPhiBlocks = ⋃_{d ∈ DefBlocks} DF(d)
+for each B in MemPhiBlocks:
+  insert memφ at start of B
+
+// Phase 2: Renaming
+versionStack = [ M0 ]    // initial version at entry
+function renameBlock(B):
+  saveStack = versionStack.copy()
+  if B has memφ:
+    Mφ = newVersion()
+    B.memφ.version = Mφ
+    versionStack.push(Mφ)
+  for instr in B.instructions:
+    if instr is alloca or store:
+      Ms = newVersion()
+      instr.version = Ms
+      versionStack.push(Ms)
+    else if instr is load:
+      instr.version = versionStack.top()
+  for child in dominatorTree.childrenOf(B):
+    renameBlock(child)
+  versionStack = saveStack
+
+renameBlock(entryBlock)</code></pre>
 
     <h2>Mathematical Formulation</h2>
     <div class="box" style="background:var(--code);padding:1rem;">
-      <div style="font-size:1.3em;text-align:center;margin-bottom:1rem;">
+      <div style="font-size:1.15em;text-align:center;margin-bottom:1rem;">
         \[
-          \text{DefBlocks} = \{ B \mid B \text{ contains a } \texttt{store}/\texttt{alloca} \}
+          \mathrm{DefBlocks} = \{\,B \mid B \text{ contains a } \texttt{alloca}\text{ or }\texttt{store}\,\}
         \]
         \[
-          \text{MemPhiBlocks} = \bigcup_{d\in\text{DefBlocks}} \mathrm{DF}(d)
+          \mathrm{MemPhiBlocks}
+          = \bigcup_{d \in \mathrm{DefBlocks}} \mathrm{DF}(d)
         \]
         \[
-          \text{InsertMemPhi}(B) : M_B = \phi\bigl(M_{p_1},M_{p_2},\dots,M_{p_k}\bigr)
+          \mathrm{InsertMemPhi}(B)\!:\;
+          M_B \;=\; \phi\bigl(M_{p_1},M_{p_2},\dots,M_{p_k}\bigr)
           \quad\text{for }p_i\in\mathrm{preds}(B)
+        \]
+        \[
+          \mathrm{versionStack}\colon B\;\mapsto\;\text{stack of memory versions at entry to }B,\quad
+          \mathrm{versionStack}(\mathrm{entry})=[M_0]
         \]
       </div>
       <p><em>Notation:</em></p>
       <ul>
         <li><strong>CFG</strong> — control‑flow graph</li>
-        <li><strong>DefBlocks</strong> — blocks containing a memory definition</li>
-        <li><strong>\(\mathrm{DF}(d)\)</strong> — dominance frontier of block <code>d</code></li>
-        <li><strong>memφ</strong> — memory φ‑node merging incoming versions</li>
-        <li><strong>M0</strong> — the initial memory version at entry</li>
+        <li><strong>DefBlocks</strong> — blocks containing a memory definition (<code>alloca</code> or <code>store</code>)</li>
+        <li><strong>DF(d)</strong> — dominance frontier of block <code>d</code></li>
+        <li><strong>MemPhiBlocks</strong> — blocks where a <code>memφ</code> is inserted</li>
+        <li><strong>memφ</strong> — memory φ‑node merging incoming versions</li>
+        <li><strong>alloca</strong> — stack allocation (memory definition)</li>
+        <li><strong>store</strong> — memory write (definition)</li>
+        <li><strong>load</strong> — memory read (use)</li>
+        <li><strong>M0</strong> — initial memory version at entry</li>
         <li><strong>Mφ, Ms</strong> — fresh memory version names for φ‑nodes and stores</li>
-        <li><strong>versionStack</strong> — the stack of current memory versions during renaming (used in the pseudo‑code)</li>
+        <li><strong>preds(B)</strong> — set of immediate predecessors of block <code>B</code> in the CFG</li>
+        <li><strong>versionStack</strong> — mapping from block to the stack of current memory versions during renaming</li>
       </ul>
     </div>
 
