@@ -77,52 +77,74 @@
   <main>
     <h1>Call-Graph Construction</h1>
 
- <h2>Problem definition</h2>
-  <div class="box">
-    <p>A call graph is an artifact produced by program analysis tools to record the <b>relationships between a function and the functions it calls</b>. Building a callgraph,  like many static analysis, is known to be an <b>undecidable</b> problem, meaning there is no perfect solution to build a perfect static callgraph. It relies on tricks and techniques to approximate the best callgraph possible. 
-    <br><br>Numerous techniques exist to improve callgraph generation at compile time, such as <b>Reach Analysis</b>b>, <b>Class Hierarchy Analysis</b>, <b>Rapid type Analysis</b>, etc. <br>Most of these techniques are useful in an Object Oriented program paradigm, since this tool focuses more on Rust the solution differs a bit. (Maybe in the future supports for OOP languages will be added)<br>
-    <br>Call-graph analysis on Rust’s LLVM IR is easier because:<br>
-    - Generics are monomorphised → almost every call is a direct <code>call @func_name</code>, not a virtual or template dispatch.<br>
-    - No class inheritance tree → you don’t need CHA or RTA; there’s no subtype hierarchy to walk.<br>
-    - Only two kinds of indirect calls:<br>
-        - <b>Trait objects (dyn Trait)</b> lowered to <b>v-tables</b> we can parse<br>
-        - <b>Function pointers</b> tracked by simple points-to or metadata<br>
-    <br><b>Monomorphization</b> is the process where the compiler takes a generic function or type (one written to work over any type T) and, at compile time, generates a separate, concrete version for each actual type it’s used with.<br>
-    <br>We solve both in our fixed-point loop by:<br>
-    - Seeding the points-to sets with<br>
-        - Every function pointer stored in a <code>@vtable.* global</code> (trait-object slots).<br>
-        - Every function whose address is “taken” and stored in some variable (raw function pointers).<br>
-    - Propagating those seeds along all pointer‐flow edges (loads, stores, bitcasts, φ-nodes, GEPs).<br>
-    - Resolving each indirect <code>call %p(...)</code> by looking up the final points-to set <code>pts[%p]</code> and adding an edge to every function in it.<br>
-    <br>Because monomorphized generic calls show up as call @foo_u32 or call @foo_String (i.e. direct <code>getCalledFunction()</code> hits), the algorithm does nothing special for generics: they already appear as direct edges in step 1 of each iteration.<br>
-    </p>
-  </div>
+    <h2>Problem definition</h2>
+    <div class="box">
+      <p>
+        A call graph is an artifact produced by program analysis tools to record the <b>relationships between a function and the functions it calls</b>. Building a callgraph, like many static analyses, is known to be an <b>undecidable</b> problem, meaning there is no perfect solution to build a perfect static callgraph. It relies on tricks and techniques to approximate the best callgraph possible.
+        <br><br>
+        Numerous techniques exist to improve callgraph generation at compile time, such as <b>Reach Analysis</b>, <b>Class Hierarchy Analysis</b>, <b>Rapid Type Analysis</b>, etc. Most of these techniques are useful in an Object Oriented program paradigm; since this tool focuses on Rust, the solution differs a bit. (Maybe in the future support for OOP languages will be added.)
+        <br><br>
+        Call-graph analysis on Rust’s LLVM IR is easier because:
+      </p>
+      <ul>
+        <li>Generics are monomorphised → almost every call is a direct <code>call @func_name</code>, not a virtual or template dispatch.</li>
+        <li>No class inheritance tree → you don’t need CHA or RTA; there’s no subtype hierarchy to walk.</li>
+        <li>Only two kinds of indirect calls:
+          <ul>
+            <li><b>Trait objects (dyn Trait)</b> lowered to <b>v-tables</b> we can parse</li>
+            <li><b>Function pointers</b> tracked by simple points-to or metadata</li>
+          </ul>
+        </li>
+      </ul>
+      <p>
+        <b>Monomorphization</b> is the process where the compiler takes a generic function or type (one written to work over any type <code>T</code>) and, at compile time, generates a separate, concrete version for each actual type it’s used with.
+      </p>
+      <p>
+        We solve both in our fixed-point loop by:
+      </p>
+      <ul>
+        <li>Seeding the points-to sets with:
+          <ul>
+            <li>Every function pointer stored in a <code>@vtable.* global</code> (trait-object slots).</li>
+            <li>Every function whose address is “taken” and stored in some variable (raw function pointers).</li>
+          </ul>
+        </li>
+        <li>Propagating those seeds along all pointer‑flow edges (loads, stores, bitcasts, φ-nodes, GEPs).</li>
+        <li>Resolving each indirect <code>call %p(...)</code> by looking up the final points-to set <code>pts[%p]</code> and adding an edge to every function in it.</li>
+      </ul>
+      <p>
+        Because monomorphized generic calls show up as <code>call @foo_u32</code> or <code>call @foo_String</code> (i.e. direct <code>getCalledFunction()</code> hits), the algorithm does nothing special for generics: they already appear as direct edges in step 1 of each iteration.
+      </p>
+      <p><strong>Key insight:</strong> we don’t just scan for direct calls—we first run a <em>flow-insensitive</em> points-to analysis over the entire IR to conservatively resolve all function-pointer targets. That initial points-to graph seeds our indirect‑call edges and lets us iterate to a much more precise call graph.</p>
+    </div>
 
     <h2>Plain text algorithm</h2>
     <div class="box">
       <p>We repeat these steps until we add no new edges:</p>
       <ol>
         <li>
-          <strong>Walk every basic block:</strong>
+          <strong>Walk every basic block (using FI points-to info):</strong>
+          <p><em>Prerequisite:</em> have initial points-to sets for all function‑pointer variables, computed by a fast flow-insensitive pass.</p>
           <ul>
             <li>On a direct call, add an edge: <code>caller → callee</code>.</li>
-            <li>On an indirect call, remember the call site and its pointer variable.</li>
+            <li>On an indirect call, look up the variable’s current FI points-to set (<code>P<sub>FI</sub>[p]</code>) and add a provisional edge to <em>each</em> potential target; remember this call-site for later refinement.</li>
             <li>On any pointer operation (store, load, bitcast, GEP, φ-node, return, parameter), record that the source pointer can flow to the destination pointer.</li>
           </ul>
         </li>
         <li>
           <strong>Pointer-tracking phase:</strong>
           <ul>
-            <li><strong>Seed:</strong> For each pointer variable, start its set with every function from v-table slots and every address-taken function.</li>
-            <li><strong>Flood:</strong> While any variable’s set grows, copy its new functions into every variable it can flow to.</li>
+            <li><strong>Seed:</strong> Initialize each pointer’s set with its FI points-to results (all v-table slots & address-taken functions).</li>
+            <li><strong>Flood:</strong> Propagate those seeds along pointer‑flow edges to refine the points-to graph before each call-resolution pass.</li>
           </ul>
         </li>
         <li>
           <strong>Resolve indirect calls:</strong>
+          <p><em>Using the refined points-to graph from Step 2…</em></p>
           <ul>
             <li>For each remembered indirect call site, look up its variable’s final function set.</li>
             <li><strong>Build our graph</strong> by adding edges from the caller to each function in that set.</li>
-            <li>If any new edge was added, repeat from step 1.</li>
+            <li>If any new edge was added, repeat from step 1.</li>
           </ul>
         </li>
       </ol>
@@ -160,25 +182,25 @@
             P^*(\mathrm{op}(c))     & \text{if $c$ is indirect}
           \end{cases}\bigr\}$$
       </div>
+      <p><em>Here, the least-fixed-point computation of <code>P<sup>*</sup></code> is exactly our FI points-to pass—its results feed directly into <code>CG</code> to resolve indirect calls.</em></p>
       <p><em>Notation:</em></p>
       <ul>
         <li><strong>CG</strong> — The call graph—the set of caller→callee edges</li>
         <li><strong>=</strong> — “equals” or “is defined as”</li>
         <li><strong>{ … }</strong> — A set</li>
-        <li><strong>( , )</strong> — 	An ordered pair or tuple</li>
-        <li><strong>caller</strong> — A function mapping each call‑site c to the function that contains it</li>
-        <li><strong>(c)</strong> — 	The call‑site being considered</li>
-        <li><strong>t</strong> —  A variable ranging over possible callee functions</li>
-        <li><strong>∣ (“such that”)</strong> — 	Introduces the conditions that select which pairs belong to the set</li>
-        <li><strong>c ∈ C</strong> — The call‑site c is one element of the set C of all call‑sites</li>
-        <li><strong>,</strong> — 	“and” (both conditions must hold)</li>
-        <li><strong>t ∈ …</strong> — 	The target t must come from the following case‑analysis result</li>
-        <li><strong>{…​</strong> — A two‑branch definition depending on whether c is direct or indirect</li>
-        <li><strong>{callee(c)}</strong> — If c is direct, the singleton set containing the statically resolved callee</li>
-        <li><strong>{…​</strong> — A two‑branch definition depending on whether c is direct or indirect</li>
-        <li><strong>P*</strong> — The least fixed point of the points‑to mapping PP</li>
-        <li><strong>op(c)</strong> — The SSA value (pointer) used by the indirect call at call‑site c</li>
-        <li><strong>P*(op(c))</strong> — “All functions that the pointer op(c) may refer to”</li>
+        <li><strong>( , )</strong> — An ordered pair or tuple</li>
+        <li><strong>caller</strong> — A function mapping each call‑site <code>c</code> to the function that contains it</li>
+        <li><strong>c</strong> — The call‑site being considered</li>
+        <li><strong>t</strong> — A variable ranging over possible callee functions</li>
+        <li><strong>∣ (“such that”)</strong> — Introduces the conditions that select which pairs belong to the set</li>
+        <li><strong>c ∈ C</strong> — The call‑site <code>c</code> is one element of the set <code>C</code> of all call‑sites</li>
+        <li><strong>,</strong> — “and” (both conditions must hold)</li>
+        <li><strong>t ∈ …</strong> — The target <code>t</code> must come from the following case‑analysis result</li>
+        <li><strong>{…}</strong> — A two‑branch definition depending on whether <code>c</code> is direct or indirect</li>
+        <li><strong>{callee(c)}</strong> — If <code>c</code> is direct, the singleton set containing the statically resolved callee</li>
+        <li><strong>P*</strong> — The least fixed point of the points‑to mapping <code>P</code></li>
+        <li><strong>op(c)</strong> — The SSA value (pointer) used by the indirect call at call‑site <code>c</code></li>
+        <li><strong>P*(op(c))</strong> — “All functions that the pointer <code>op(c)</code> may refer to”</li>
       </ul>
     </div>
 
