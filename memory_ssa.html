@@ -48,13 +48,23 @@
 
     <h2>Problem definition</h2>
     <div class="box">
-      <p>LLVM IR uses SSA for registers but not for memory (<code>load</code>/<code>store</code>/<code>alloca</code>). This makes flow‑sensitive memory analyses (aliasing, LICM, call‑graph precision) expensive and imprecise.  
-      <strong>Memory SSA</strong> solves this by treating the entire memory state as one SSA variable:</p>
+      <p>
+        LLVM IR uses SSA for registers but not for memory (<code>load</code>/<code>store</code>/<code>alloca</code>), which makes flow‑sensitive memory analyses (aliasing, LICM, call‑graph precision) expensive and imprecise.
+      </p>
+      <p>
+        <strong>Prerequisite:</strong> an initial flow‑insensitive points‑to analysis must run first to tell us which loads and stores <em>may</em> interact. These conservative points‑to sets are used to partition and annotate memory, and a more precise (flow‑sensitive) points‑to pass will further tighten the SSA form when rerun.
+      </p>
+      <p>
+        <strong>Memory SSA</strong> solves the problem by treating the entire memory state as one SSA variable:
+      </p>
       <ul>
         <li>Insert <code>memφ</code> nodes at merge points to join memory versions.</li>
         <li>Rename each <code>alloca</code> or <code>store</code> (definition) and each <code>load</code> (use) to a unique memory version.</li>
       </ul>
-      <p>The result is a sparse, flow‑sensitive <em>def‑use graph</em> for memory, enabling precise pointer analysis, aggressive optimizations, and improved call‑graph resolution.</p>
+      <p>
+        The result is a sparse, flow‑sensitive <em>def‑use graph</em> for memory, enabling precise pointer analysis, aggressive optimizations, and improved call‑graph resolution.
+      </p>
+      <p><strong>Note:</strong> after you run your full flow‑sensitive points‑to solver, you can rebuild Memory SSA using the refined alias information to produce an even tighter def‑use graph.</p>
     </div>
 
     <h2>Plain text algorithm</h2>
@@ -62,11 +72,11 @@
       <p>Build Memory SSA in two main phases:</p>
       <ol>
         <li>
-          <strong>Φ‑node placement:</strong>
+          <strong>Φ‑node placement (using FI points‑to info):</strong>
           <ul>
             <li>Compute the CFG and its dominator tree.</li>
-            <li>Find all <strong>DefBlocks</strong> containing a memory definition (<code>alloca</code> or <code>store</code>).</li>
-            <li>Compute dominance frontiers <code>DF(d)</code> for each <code>d∈DefBlocks</code>.</li>
+            <li>Using the flow‑insensitive points‑to results, find all <strong>DefBlocks</strong> containing a memory definition (<code>alloca</code> or <code>store</code>).</li>
+            <li>Compute dominance frontiers <code>DF(d)</code> for each <code>d ∈ DefBlocks</code>.</li>
             <li>Let <strong>MemPhiBlocks</strong> be the union of those frontiers; in each such block insert a <code>memφ</code> node.</li>
           </ul>
         </li>
@@ -90,13 +100,14 @@
           </ul>
         </li>
       </ol>
+      <p><em>After a complete flow‑sensitive points‑to pass, you can re-run this construction to further reduce spurious φ‑nodes and version merges.</em></p>
     </div>
 
     <h2>Pseudo‑code</h2>
     <pre><code>// Phase 1: Φ‑node placement
 computeCFG()
 computeDominatorTree()
-DefBlocks = { B | B contains alloca or store }
+DefBlocks = { B | B contains alloca or store, per FI points-to }
 MemPhiBlocks = ⋃_{d ∈ DefBlocks} DF(d)
 for each B in MemPhiBlocks:
   insert memφ at start of B
@@ -120,13 +131,16 @@ function renameBlock(B):
     renameBlock(child)
   versionStack = saveStack
 
-renameBlock(entryBlock)</code></pre>
+renameBlock(entryBlock)
+
+// To refine: rerun after FS points-to to rebuild MemSSA with tighter defs/uses
+</code></pre>
 
     <h2>Mathematical Formulation</h2>
     <div class="box" style="background:var(--code);padding:1rem;">
       <div style="font-size:1.15em;text-align:center;margin-bottom:1rem;">
         \[
-          \mathrm{DefBlocks} = \{\,B \mid B \text{ contains a } \texttt{alloca}\text{ or }\texttt{store}\,\}
+          \mathrm{DefBlocks} = \{\,B \mid B \text{ contains a } \texttt{alloca}\text{ or }\texttt{store},\text{ per FI points-to}\}
         \]
         \[
           \mathrm{MemPhiBlocks}
@@ -144,18 +158,19 @@ renameBlock(entryBlock)</code></pre>
       </div>
       <p><em>Notation:</em></p>
       <ul>
+        <li><strong>FI points-to</strong> — flow‑insensitive points‑to sets used to guide where loads/stores may interact</li>
         <li><strong>CFG</strong> — control‑flow graph</li>
-        <li><strong>DefBlocks</strong> — blocks containing a memory definition (<code>alloca</code> or <code>store</code>)</li>
+        <li><strong>DefBlocks</strong> — blocks containing a memory definition</li>
         <li><strong>DF(d)</strong> — dominance frontier of block <code>d</code></li>
         <li><strong>MemPhiBlocks</strong> — blocks where a <code>memφ</code> is inserted</li>
-        <li><strong>memφ</strong> — memory φ‑node merging incoming versions</li>
+        <li><strong>memφ</strong> — memory φ‑node merging incoming versions</li>
         <li><strong>alloca</strong> — stack allocation (memory definition)</li>
         <li><strong>store</strong> — memory write (definition)</li>
         <li><strong>load</strong> — memory read (use)</li>
         <li><strong>M0</strong> — initial memory version at entry</li>
-        <li><strong>Mφ, Ms</strong> — fresh memory version names for φ‑nodes and stores</li>
-        <li><strong>preds(B)</strong> — set of immediate predecessors of block <code>B</code> in the CFG</li>
-        <li><strong>versionStack</strong> — mapping from block to the stack of current memory versions during renaming</li>
+        <li><strong>Mφ, Ms</strong> — fresh versions for φ‑nodes and stores</li>
+        <li><strong>preds(B)</strong> — predecessors of block <code>B</code> in the CFG</li>
+        <li><strong>versionStack</strong> — stack of current memory versions during renaming</li>
       </ul>
     </div>
 
