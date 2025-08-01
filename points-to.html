@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Mamba — Hardekopf & Lin Sparse Flow-Sensitive Pointer Analysis</title>
+  <!-- MathJax for formula rendering -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['\\(','\\)']],
+        displayMath: [['\\[','\\]']]
+      },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <style>
+    :root{
+      --accent:#0a84ff; --text:#1c1c1e; --bg:#ffffff;
+      --card:#f3f4f6; --code:#f5f5f7; --max:900px;
+    }
+    @media(prefers-color-scheme:dark){
+      :root{ --text:#e7e7e7; --bg:#26262a; --card:#323236; --code:#2a2a2e; }
+    }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+         background:var(--bg);color:var(--text);line-height:1.6;
+         display:flex;justify-content:center;padding:3rem 1rem;}
+    main{max-width:var(--max);width:100%}
+    h1{font-size:2.6rem;font-weight:700;text-align:center;margin-bottom:1rem}
+    h2{font-size:1.7rem;font-weight:600;text-align:left;margin:2.2rem 0 1rem}
+    h3{font-size:1.3rem;font-weight:600;margin-top:1rem}
+    p,li{font-size:1rem;margin-bottom:.6rem}
+    .box{background:var(--card);padding:1.6rem;border-radius:20px;
+         box-shadow:0 6px 20px rgba(0,0,0,.04);margin-bottom:2rem}
+    pre{background:var(--code);padding:1.3rem;border-radius:16px;
+        overflow:auto;font-size:.9rem;margin-bottom:1.5rem}
+    code{font-family:"SFMono-Regular",Consolas,Menlo,monospace;tab-size:2}
+    ul{padding-left:1.4rem;list-style:square} ol{margin-left:1.2rem}
+    a{color:var(--accent);text-decoration:none;font-weight:500}
+    a:hover{text-decoration:underline}
+    .small {font-size:.85rem; color: #666;}
+    footer{text-align:center;margin-top:3.5rem;font-size:.85rem}
+    .highlight {background:rgba(10,132,255,0.08);padding:4px;border-radius:4px;}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Hardekopf &amp; Lin: Sparse Flow-Sensitive Pointer Analysis</h1>
+
+    <h2>Background</h2>
+    <div class="box">
+      <p><strong>Pointer analysis</strong> determines which pointers (or heap references) may refer to which memory locations. <strong>Alias analysis</strong> is the related question: whether two expressions can refer to the same location. Together these underpin many security analyses (e.g., detecting use-after-free or taint flows).</p>
+
+      <p>There are several dimensions of precision:</p>
+      <ul>
+        <li><strong>Flow sensitivity:</strong> distinguishes program points in order—knows “before” vs “after” a statement rather than merging all effects. This reduces spurious aliasing.</li>
+        <li><strong>Context sensitivity:</strong> distinguishes different call sites of the same function so information doesn’t bleed across unrelated invocations.</li>
+      </ul>
+
+      <p>The core challenge is: doing a fully flow-sensitive, scalable, and precise analysis over large codebases is expensive. Hardekopf &amp; Lin’s algorithm gets full flow sensitivity efficiently by combining:</p>
+      <ul>
+        <li>A cheap, over-approximating <strong>flow-insensitive</strong> bootstrap (AUX).</li>
+        <li>A <strong>sparse, versioned representation</strong> of memory and pointer operations (full SSA for pointers, including heap).</li>
+        <li>A single flow-sensitive fixpoint solve over that sparse def-use graph (DUG).</li>
+      </ul>
+    </div>
+
+    <h2>High-level pipeline</h2>
+    <div class="box">
+      <p>In sequence:</p>
+      <ol>
+        <li><strong>Flow-insensitive AUX pointer analysis:</strong> conservatively approximate which loads and stores might interact; resolve indirect calls; seed the interprocedural CFG.</li>
+        <li><strong>Memory/pointer SSA &amp; partitioning:</strong> build SSA form for all pointer variables (including address-taken/heap), partition heap variables into equivalence classes, and insert φ/χ/μ to version heap updates and merges.</li>
+        <li><strong>Construct the sparse Def-Use Graph (DUG):</strong> keep only relevant operations (ALLOC, COPY, LOAD, STORE, φ/χ/μ) and connect them with labeled/unlabeled edges encoding dataflow.</li>
+        <li><strong>Flow-sensitive points-to solve:</strong> propagate precise points-to sets over the DUG until a fixpoint is reached.</li>
+        <li><strong>Optional refinement:</strong> feed tighter results back to refine call graph / SSA and rerun for marginal gains.</li>
+      </ol>
+    </div>
+
+    <h2>1. Preprocessing — Building the Sparse Def-Use Graph (DUG)</h2>
+    <div class="box">
+      <h3>1.1 AUX pass (flow-insensitive)</h3>
+      <ul>
+        <li>Quickly computes a conservative over-approximation of which stores (definitions) might reach which loads (uses).</li>
+        <li>Resolves indirect calls (function pointers, virtual-like dispatch) to potential targets, enabling a provisional interprocedural CFG (ICFG).</li>
+        <li>Translates function calls and returns into explicit <code>COPY</code> instructions for parameter passing and return values.</li>
+      </ul>
+
+      <h3>1.2 Top-level SSA &amp; partitioning</h3>
+      <ul>
+        <li>Translate all <strong>top-level</strong> (register/local) variables into SSA form. φ-functions become multi-input <code>COPY</code> nodes (e.g., <code>x₁ = φ(x₂,x₃)</code> → <code>x₁ = x₂ x₃</code>).</li>
+        <li>Group address-taken (heap or indirect memory) variables into equivalence classes called <em>partitions</em>, so memory locations with similar access patterns are tracked together.</li>
+      </ul>
+
+      <h3>1.3 Label loads and stores</h3>
+      <ul>
+        <li>For each partition <code>P</code>:</li>
+        <ul>
+          <li>Annotate each <code>STORE</code> that may modify <code>P</code> with a χ-function: <code>P = χ(P)</code>.</li>
+          <li>Annotate each <code>LOAD</code> that may read from <code>P</code> with a μ-function: <code>v = μ(P)</code>.</li>
+        </ul>
+        <li>These χ/μ annotations capture where heap definitions and uses need SSA merging.</li>
+      </ul>
+
+      <h3>1.4 Heap-SSA on partitions</h3>
+      <p>Run an SSA construction over each partition, placing φ/χ/μ nodes so that heap-related definitions and uses are versioned. Now every heap memory operation is in strict SSA form, separating “before” and “after” effects.</p>
+
+      <h3>1.5 Construct the DUG</h3>
+      <ul>
+        <li><strong>Nodes:</strong> one for each ALLOC, COPY, LOAD, STORE, and SSA φ/χ/μ.</li>
+        <li><strong>Edges:</strong>
+          <ul>
+            <li><strong>Unlabeled</strong>: for top-level variable dataflow (ALLOC/COPY/LOAD → uses).</li>
+            <li><strong>Labeled by partition P</strong>: from a STORE with χ(P) to any LOAD or φ/μ/χ using P.</li>
+            <li><strong>Unlabeled</strong>: from φ nodes of partitions to their users.</li>
+          </ul>
+        </li>
+      </ul>
+    </div>
+
+    <h2>2. Data structures for the sparse solver</h2>
+    <div class="box">
+      <ul>
+        <li><strong>Worklist</strong>: initialized with all ALLOC nodes.</li>
+        <li><strong>Global points-to graph</strong> <code>PG</code>: holds points-to sets for top-level variables. For a top-level variable <code>v</code>, <code>P<sub>top</sub>(v)</code> is its set.</li>
+        <li><strong>Per-node IN/OUT graphs</strong>:
+          <ul>
+            <li>Each LOAD or φ node <code>k</code> has an <code>IN<sub>k</sub></code> storing points-to sets <code>P<sub>k</sub>(v)</code> for address-taken variables reaching it.</li>
+            <li>Each STORE node <code>k</code> has <code>IN<sub>k</sub></code> and <code>OUT<sub>k</sub></code> graphs for address-taken variables it may define.</li>
+          </ul>
+        </li>
+      </ul>
+      <p>All these graphs start empty. The partition function <code>part(v)</code> maps an address-taken variable to its partition.</p>
+    </div>
+
+    <h2>3. Sparse flow-sensitive fixpoint iteration</h2>
+    <div class="box">
+      <pre><code>while Worklist ≠ ∅:
+    k = removeOne(Worklist)
+
+    switch (kind of node k):
+      case ALLOC:
+        let x = &o
+        Δ = {o}
+        PG[x] ∪= Δ
+        propagate Δ along all unlabeled outgoing edges from k
+
+      case COPY:
+        let x = y z …
+        Δ = PG[y] ∪ PG[z] ∪ …
+        PG[x] ∪= Δ
+        propagate Δ along all unlabeled outgoing edges
+
+      case LOAD (v = μ(P)):
+        IN_k[P] = ⋃_{p ∈ part(P)} PG[p]      // gather incoming top-level info
+        Δ = IN_k[P]
+        propagate Δ along all edges labeled with P
+
+      case STORE (P = χ(P)):
+        IN_k[P] = ⋃_{p ∈ part(P)} PG[p]
+        OUT_k[P] = (IN_k[P] without old stored targets) ∪ new stores
+        Δ = OUT_k[P] ∖ IN_k[P]
+        propagate Δ along all edges labeled with P
+
+      case φ (on partition P):
+        IN_k[P] = union of incoming IN/OUT for P
+        Δ = IN_k[P]
+        propagate Δ along all unlabeled outgoing edges
+
+    // propagation: if target's graph grows, re-add that node to Worklist
+</code></pre>
+      <p><strong>Propagation</strong> means: for each target node reachable from <code>k</code> via a DUG edge, merge Δ into its corresponding graph (<code>PG</code> or <code>IN</code>), and if that target gained new info, put it back on the worklist.</p>
+    </div>
+
+    <h2>Why this is flow-sensitive and sparse</h2>
+    <div class="box">
+      <p><strong>Flow-sensitive:</strong> The DUG edges, combined with SSA versioning, encode the causal order—uses pull from the precise definitions in effect at that program point. Updates don’t retroactively affect earlier uses because each definition created a new version.</p>
+      <p><strong>Sparse:</strong> The algorithm never walks the full control-flow graph. It only propagates along the tiny DUG containing pointer-relevant operations, so irrelevant statements are skipped entirely.</p>
+      <p>This staging—one cheap flow-insensitive pass to bootstrap, then one precise flow-sensitive solve on a compressed graph—is what gives scalability to millions of lines of code.</p>
+    </div>
+
+    <h2>Comparison / notes</h2>
+    <div class="box">
+      <p class="small">Chase et al. proposed dynamically maintaining SSA during flow-sensitive pointer analysis; their idea wasn’t evaluated directly, but related approaches (e.g., Tok et al.) showed scalability limits when updating SSA dynamically. Hardekopf &amp; Lin instead compute SSA upfront (with AUX guidance) and then solve sparsely, avoiding repeated full reformation of SSA, yielding practical performance on large programs.</p>
+    </div>
+
+    <h2>Mathematical formulation (intuition)</h2>
+    <div class="box">
+      <div style="font-size:1.1em; margin-bottom:.8rem;">
+        $$P^* = \mathrm{lfp}_P\left(v \mapsto \mathrm{Seeds}(v) \cup \bigcup_{(u,v)\in E} P(u)\right)$$
+        $$\mathrm{Solution} = \text{fixpoint of propagation over the DUG starting from the bottom (empty) sets}$$
+      </div>
+      <p><em>Interpretation:</em> Starting from conservative seeds (from AUX), propagate along the sparse edges; because the transfer function is monotonic over the finite lattice of pointsto sets, the iteration converges to a least fixed point.</p>
+    </div>
+
+    <footer>
+      <p><a href="index.html">&larr; Back to main page</a></p>
+    </footer>
+  </main>
+</body>
+</html>
