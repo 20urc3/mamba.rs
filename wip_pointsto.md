@@ -121,3 +121,8 @@ When the worklist finally empties, every node’s IN/OUT and the global `PG` are
 * **Sparse**: We only ever touch the tiny DUG (pointer ops + SSA φ/χ/μ), not the full CFG.  No unnecessary propagation through non‑pointer statements.
 
 This staged, sparse approach is what lets Hardekopf & Lin scale precise flow‑sensitive analysis to millions of lines of code.
+
+Chase et al [5] propose that SSA form be dynamically computed during the course of the flow-sensitive pointer analysis
+Chase et al do not evaluate their idea, but a similar idea is evaluated by Tok et al [31], whose algorithm can analyze
+C programs with almost 70,000 lines of code in roughly 30 minutes. The scalability of this approach is limited by the cost
+of dynamically updating SSA form.
